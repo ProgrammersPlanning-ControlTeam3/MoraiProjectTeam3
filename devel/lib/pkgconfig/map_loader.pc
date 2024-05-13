@@ -1,0 +1,8 @@
+prefix=/home/ubuntu/final_project/devel
+
+Name: map_loader
+Description: Description of map_loader
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

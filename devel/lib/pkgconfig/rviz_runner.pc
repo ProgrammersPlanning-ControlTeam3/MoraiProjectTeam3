@@ -1,0 +1,8 @@
+prefix=/home/ubuntu/final_project/devel
+
+Name: rviz_runner
+Description: Description of rviz_runner
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 
