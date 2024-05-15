@@ -1,8 +1,0 @@
-prefix=/home/ubuntu/final_project/devel
-
-Name: parking
-Description: Description of parking
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 
