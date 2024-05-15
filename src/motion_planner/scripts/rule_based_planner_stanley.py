@@ -19,7 +19,7 @@ current_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_path)
 
 from lib.mgeo.class_defs import *
-sys.path.insert(0, '/home/ubuntu/final_project/src')
+sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 #print(sys.path)
 
 from control.scripts.pid_controller import pidControl
@@ -103,7 +103,7 @@ class rule_based_planner:
                     if heading_difference > 1.0:
                         if nearest_dis < 25.0:
                             self.ctrl_cmd_msg.accel = 0.0
-                            self.ctrl_cmd_msg.brake = 1.0
+                            # self.ctrl_cmd_msg.brake = 1.0
 
                             rospy.loginfo('#############brake##############')
 

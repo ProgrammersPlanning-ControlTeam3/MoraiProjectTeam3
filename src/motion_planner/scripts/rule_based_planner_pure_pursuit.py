@@ -19,11 +19,11 @@ current_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_path)
 
 from lib.mgeo.class_defs import *
-sys.path.insert(0, '/home/ubuntu/final_project/src')
+sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 #print(sys.path)
 
 from control.scripts.pid_controller import pidControl
-from control.scripts.lateral_controller import pure_pursuit
+from control.scripts.lateral_controller import pure_pursuit_no_npc
 from control.scripts.longitudinal_controller import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
 
@@ -63,7 +63,7 @@ class rule_based_planner:
         # 제어 시스템 및 알고리즘 초기화 부분
         self.pid = pidControl() # PID Control
         self.vel_planning = velocityPlanning(self.target_velocity / 3.6, 0.15) # Velocity Control
-        self.pure_pursuit = pure_pursuit() # Pure Pursuit control
+        self.pure_pursuit = pure_pursuit_no_npc() # Pure Pursuit control
         self.object_detector = object_detector() # Object Detection to avoid
 
         # 무한 루프: self.is_global_path가 True로 설정될때까지 계속 실행.
