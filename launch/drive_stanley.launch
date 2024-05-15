@@ -1,14 +1,15 @@
 <launch>
+    <!-- Stanley : IMU/GPS 센서 후륜 축으로 이동 필요! -->
+
     <!-- PATH PLANNING-->
     <node pkg="path_planner" type="global_path_pub.py" name="global_path_pub" />
     <node pkg="path_planner" type="local_path_pub.py" name="local_path_pub" />
+    <!-- <node pkg="path_planner" type="lattice_planner.py" name="lattice_path_pub" output="screen"/> -->
+
     <!-- <node pkg="parking" type="path_maker.py" name="parking" /> -->
 
-    <!-- CONTROL_Pure Pursuit -->
-    <node pkg="motion_planner" type="rule_based_planner_pure_pursuit.py" name="rule_based_planner" output="screen"/>
-
     <!-- CONTROL_Stanley -->
-    <!-- <node pkg="motion_planner" type="rule_based_planner_stanley.py" name="rule_based_planner" output="screen"/> -->
+    <node pkg="motion_planner" type="rule_based_planner_stanley.py" name="rule_based_planner" output="screen"/>
 
     <!-- GPS AND IMU SENSOR -->
     <node pkg="state_estimator" type="gpsimu_parser.py" name="GPS_IMU_parser" />
