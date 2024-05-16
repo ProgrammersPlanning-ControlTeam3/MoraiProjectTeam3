@@ -133,10 +133,20 @@ class stanley :
         '''
          Tunning Gain Constant
         '''
-        self.k=1.0 # Stanley Gain
-        self.k_psi=1.0 # For heading Error
-        self.k_y=1.1 # For CTR Error
+        self.k=0.6 # Stanley Gain
+        self.k_psi=0.9 # For heading Error
+        self.k_y=1.2 # For CTR Error
+        # self.alpha = 0.5  # Smoothing factor
+        # self.prev_CTR = 0.0
 
+        ## Testing
+        # self.k=0.9 # Stanley Gain
+        # self.k_psi=1.2 # For heading Error
+        # self.k_y=1.1 # For CTR Error
+        # # self.alpha = 0.5  # Smoothing factor
+        # # self.prev_CTR = 0.0
+        
+        
         self.vehicle_length = 5.155 # Vehilce Length,,, you have to change it
         self.lfd = 10 # Look forward Distance
         if self.vehicle_length is None or self.lfd is None:
@@ -148,7 +158,7 @@ class stanley :
     '''
 
     Callback Function
-    path: path info
+    path: path infox
     odom: yaw, position info
     status: Current status
 
@@ -233,7 +243,17 @@ class stanley :
              For the precise control, we added the control term
 
             '''
-            CTR=atan2(self.k * cross_track_error, self.target_velocity)
+            CTR = atan2(self.k * cross_track_error, self.target_velocity)
+        
+            # # Apply smoothing to CTR value
+            # CTR = self.alpha * raw_CTR + (1 - self.alpha) * self.prev_CTR
+            # self.prev_CTR = CTR
+
+            # # Apply a limit to the CTR change
+            # max_CTR_change = 0.005  # Change this value as needed
+            # CTR = max(min(CTR, self.prev_CTR + max_CTR_change), self.prev_CTR - max_CTR_change)
+
+
             print("CTR Error: ", CTR)
             steering = self.k_psi*heading_error + self.k_y * CTR
             rospy.loginfo("steering: %s", steering)
