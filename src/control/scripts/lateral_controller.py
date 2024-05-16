@@ -203,6 +203,7 @@ class stanley :
 
     '''
     def calc_stanley_control(self):
+            steering = 0
             if not self.is_global_path or not self.is_odom:
                 return 0.0 # No control if path or odom is not available
             # k = 1  # Stanley gain
@@ -246,6 +247,8 @@ class stanley :
             CTR = atan2(self.k * cross_track_error, self.target_velocity)
         
             # # Apply smoothing to CTR value
+            # raw_CTR = atan2(self.k * cross_track_error, self.target_velocity)
+
             # CTR = self.alpha * raw_CTR + (1 - self.alpha) * self.prev_CTR
             # self.prev_CTR = CTR
 
