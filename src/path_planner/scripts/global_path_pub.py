@@ -41,8 +41,8 @@ class dijkstra_path_pub :
         # PARKING_ZONE = "PARKING"
         
         start = 'A119BS010209'
-        highway1 = 'A119BS010313'
-        highway2 = 'A119BS010316'
+        highway1 = 'A119BS010312'
+        highway2 = 'A119BS010341'
         tollgate = 'A119BS010324'
         parking_lot = 'custom'
         parking_entrance = 'start'
