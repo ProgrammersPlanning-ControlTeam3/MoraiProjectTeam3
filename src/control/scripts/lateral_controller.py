@@ -65,6 +65,7 @@ class pure_pursuit_no_npc:
         return currnet_waypoint
 
     def calc_pure_pursuit(self, ):
+        local_path_point = None
 
         self.lfd = (self.status_msg.velocity.x) * self.lfd_gain
 
@@ -158,6 +159,7 @@ class pure_pursuit:
         return currnet_waypoint
 
     def calc_pure_pursuit(self, ):
+        local_path_point = None
 
         self.lfd = (self.status_msg.velocity.x) * self.lfd_gain
 
