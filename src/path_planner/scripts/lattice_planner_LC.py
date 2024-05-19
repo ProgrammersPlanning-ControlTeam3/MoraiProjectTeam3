@@ -53,7 +53,7 @@ class latticePlanner:
         # TODO: (6) 생성된 충돌회피 경로 중 낮은 비용의 경로 선택
 
         selected_lane = -1
-        lane_weight = [100, 1]  # reference path
+        lane_weight = [1, 10, 100]  # reference path
 
         for obstacle in object_data.npc_list:
             for path_num in range(len(out_path)):
@@ -97,8 +97,8 @@ class latticePlanner:
 
         look_distance = int(vehicle_velocity * 0.2 * 2)
 
-        if look_distance < 40:
-            look_distance = 40
+        if look_distance < 30:
+            look_distance = 30
 
         if len(ref_path.poses) > look_distance:
             # TODO: (3) 좌표 변환 행렬 생성
@@ -132,7 +132,7 @@ class latticePlanner:
             local_end_point = det_trans_matrix.dot(world_end_point)
             world_ego_vehicle_position = np.array([[vehicle_pose_x], [vehicle_pose_y], [1]])
             local_ego_vehicle_position = det_trans_matrix.dot(world_ego_vehicle_position)
-            lane_off_set = [-3, 3]  # Only 2 offsets now
+            lane_off_set = [0, 4, 8]  # Only 3 offsets now
             local_lattice_points = []
 
             for i in range(len(lane_off_set)):

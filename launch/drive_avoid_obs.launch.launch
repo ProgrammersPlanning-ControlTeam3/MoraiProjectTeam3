@@ -2,7 +2,7 @@
     <!-- PATH PLANNING-->
     <node pkg="path_planner" type="global_path_pub.py" name="global_path_pub" />
     <node pkg="path_planner" type="local_path_pub.py" name="local_path_pub" />
-    <node pkg="path_planner" type="lattice_planner.py" name="lattice_path_pub" output="screen"/>
+    <node pkg="path_planner" type="lattice_planner_LC.py" name="lattice_path_pub" output="screen"/>
 
     <!-- <node pkg="parking" type="path_maker.py" name="parking" /> -->
 
