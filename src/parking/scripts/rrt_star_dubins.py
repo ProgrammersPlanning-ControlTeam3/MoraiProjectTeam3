@@ -7,30 +7,9 @@ from dubins import Dubins, pify
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+import obstacle
 
 np.random.seed(2)
-
-class Obstacle(object):
-    def __init__(self, x, y, r):
-        self.x = x
-        self.y = y
-        self.r = r
-
-    def plot(self, color='k'):
-        theta = np.linspace(0, np.pi*2, num=30)
-        x = self.x + self.r * np.cos(theta)
-        y = self.y + self.r * np.sin(theta)
-
-        plt.plot(x, y, color=color)
-
-    def is_inside(self, x, y):
-        dist = np.hypot(x - self.x, y - self.y)
-        if dist <= self.r:
-            return True
-        else:
-            return False
-
-
 class RRTStar(object):
     def __init__(self, start, goal, config):
         self.G = nx.DiGraph()
@@ -53,6 +32,7 @@ class RRTStar(object):
 
     def sample_free(self, obstacles, space):
         min_x, max_x, min_y, max_y = space
+        #goal 과의 거리가 정해진 값보다 멀다면 랜덤 노드생성
         if np.random.rand() > self.config["goal_sample_rate"]:
             rand_x = np.random.uniform(min_x, max_x)
             rand_y = np.random.uniform(min_y, max_y)
@@ -192,29 +172,22 @@ if __name__ == '__main__':
     min_y, max_y = -20, 20
 
     #plot 공간
+    #사각형 공간으로 바꿔야함.
     space = [min_x, max_x, min_y, max_y]
 
-    #시작지점 랜덤 설정
-    start_position = np.random.uniform(low=-20, high=-5, size=2)
-    start_yaw = np.random.uniform(low=0, high=2*np.pi, size=1)[0]
+    #시작지점 설정
+    start_position = [-7.34284, 1062.8048]
+    start_yaw = [57.831]
     start = [start_position[0], start_position[1], start_yaw]
 
-    #goal 포지션 랜덤
+    #goal 포지션
     goal_position = np.random.uniform(low=5, high=20, size=2)
     goal_yaw = np.random.uniform(low=0, high=2*np.pi, size=1)[0]
     goal = [goal_position[0], goal_position[1], goal_yaw]
 
 
-    #랜덤 obstacle 원형 
+    #랜덤 obstacle 원형
     obstacles = []
-    for i in range(25):
-        x = np.random.uniform(low=min_x, high=max_x, size=1)
-        y = np.random.uniform(low=min_y, high=max_y, size=1)
-        r = np.random.uniform(low=1.0, high=5.0)
-        obstacle = Obstacle(x, y, r)
-
-        if not obstacle.is_inside(start[0], start[1]) and not obstacle.is_inside(goal[0], goal[1]):
-            obstacles.append(obstacle)
 
     #그리기
     for obs in obstacles:
@@ -223,6 +196,7 @@ if __name__ == '__main__':
     #rrt star config
     config = {
         "eta": 10.0,
+        #gamma = 최적화 범위 
         "gamma_rrt_star": 10.0,
         "goal_sample_rate": 0.05,
     }
