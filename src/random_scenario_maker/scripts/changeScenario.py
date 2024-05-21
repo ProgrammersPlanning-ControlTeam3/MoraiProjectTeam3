@@ -9,7 +9,7 @@ def random_boolean(probability):
 
 def main():
     # base scenario file
-    base_file_path = 'Morai_Project/scenario/random_obstacle_base.json'
+    base_file_path = 'src/random_scenario_maker/scenario/random_obstacle_base.json'
 
     with open(base_file_path, 'r') as f:
         data = json.load(f)
@@ -29,7 +29,7 @@ def main():
         if n >= len(object_lists):
             n = 0
 
-    with open('Morai_Project/scenario/random_obstacle_scenario.json', 'w') as f:
+    with open('src/random_scenario_maker/scenario/random_obstacle_scenario.json', 'w') as f:
         json.dump(data, f, indent=2)
 
     print(random.choice(blankParkingSpace))
