@@ -7,9 +7,7 @@ from dubins import Dubins, pify
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
-import obstacle
-
-np.random.seed(2)
+import obstacle as obs
 
 class Obstacle(object):
     def __init__(self, x, y, r):
@@ -207,8 +205,10 @@ class RRTStar(object):
 
 
 if __name__ == '__main__':
-    min_x, max_x = -20, 20
-    min_y, max_y = -20, 20
+    # min_x, max_x = -20, 20
+    # min_y, max_y = -20, 20
+    min_x, max_x = -21.75, 41.6
+    min_y, max_y = 1005.84, 1076.51
 
     #plot 공간
     space = [min_x, max_x, min_y, max_y]
@@ -223,14 +223,18 @@ if __name__ == '__main__':
     goal_yaw = np.random.uniform(low=0, high=2*np.pi, size=1)[0]
     goal = [goal_position[0], goal_position[1], goal_yaw]
 
-
-    #랜덤 obstacle 원형 
+    # print(start, goal)
+    
+    #랜덤 obstacle 원형
     obstacles = []
     for i in range(25):
         x = np.random.uniform(low=min_x, high=max_x, size=1)
         y = np.random.uniform(low=min_y, high=max_y, size=1)
-        r = np.random.uniform(low=1.0, high=5.0)
-        obstacle = Obstacle(x, y, r)
+        r = np.random.uniform(low=1.0, high=3.0)
+        angle = np.random.uniform(low=0, high=2*np.pi, size=1)[0]
+        # obstacle = obs.Obstacle(x, y, r)
+        obstacle = obs.RectangleObstacle(x, y, r, r, angle)
+        
 
         if not obstacle.is_inside(start[0], start[1]) and not obstacle.is_inside(goal[0], goal[1]):
             obstacles.append(obstacle)
