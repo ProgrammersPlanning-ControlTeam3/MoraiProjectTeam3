@@ -2,14 +2,36 @@
 
 import numpy as np
 
-from dubins import Dubins, pify
+from dubins import Dubins
+from scenarioLoader import ScenarioLoader
 
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
-import obstacle
+import matplotlib.patches as patches
+import obstacle as obstacle
 
-np.random.seed(2)
+"""
+1. 출발지점과 골 그리고 주차장 범위 정하기 (완)
+2. 주차범위 시각화 하기
+3. obstacle 불러오기
+4.
+
+"""
+def twopify(alpha):
+    return alpha - np.pi * 2 * np.floor(alpha / (np.pi * 2))
+
+def pify(alpha):
+    v = np.fmod(alpha, 2*np.pi)
+    if (v < - np.pi):
+        v += 2 * np.pi
+    else:
+        v -= 2 * np.pi
+    return v
+
+def degrees_to_radians(degrees):
+    return degrees * (np.pi / 180)
+
 class RRTStar(object):
     def __init__(self, start, goal, config):
         self.G = nx.DiGraph()
@@ -168,8 +190,13 @@ class RRTStar(object):
 
 
 if __name__ == '__main__':
-    min_x, max_x = -20, 20
-    min_y, max_y = -20, 20
+    #frame
+    min_x, max_x = -21.75, 41.6
+    min_y, max_y = 1005.84, 1076.51
+    
+    #parking lot space
+    scenario = ScenarioLoader()
+    objectList = scenario.getObject()
 
     #plot 공간
     #사각형 공간으로 바꿔야함.
@@ -177,17 +204,20 @@ if __name__ == '__main__':
 
     #시작지점 설정
     start_position = [-7.34284, 1062.8048]
-    start_yaw = [57.831]
+    start_yaw = degrees_to_radians(57.831) # 57.831
     start = [start_position[0], start_position[1], start_yaw]
 
     #goal 포지션
-    goal_position = np.random.uniform(low=5, high=20, size=2)
-    goal_yaw = np.random.uniform(low=0, high=2*np.pi, size=1)[0]
+    goal_position = [3.25, 1022.73]
+    goal_yaw = degrees_to_radians(-120.769) #-120.769
     goal = [goal_position[0], goal_position[1], goal_yaw]
 
 
-    #랜덤 obstacle 원형
+    #obstacle 토픽 아니면 시나리오로 받기
     obstacles = []
+    for object in objectList :
+        
+        pass
 
     #그리기
     for obs in obstacles:
@@ -196,7 +226,7 @@ if __name__ == '__main__':
     #rrt star config
     config = {
         "eta": 10.0,
-        #gamma = 최적화 범위 
+        #gamma = 최적화 범위
         "gamma_rrt_star": 10.0,
         "goal_sample_rate": 0.05,
     }
@@ -212,7 +242,7 @@ if __name__ == '__main__':
     for i in range(500):
         rand_node_state = rrt_star.sample_free(obstacles, space)
         # plt.plot(rand_node[0], rand_node[1], '.')
-
+        
         nearest_node_id = rrt_star.get_nearest(rand_node_state)
         nearest_node_state = rrt_star.get_node(nearest_node_id)
         new_node_state = rrt_star.steer(nearest_node_state, rand_node_state)
@@ -293,7 +323,6 @@ if __name__ == '__main__':
         xs = []
         ys = []
 
-        print(path)
 
         for node_idx in range(len(path)-1):
             node_id = path[node_idx+1]
