@@ -62,18 +62,18 @@ class rule_based_planner:
 
         # 제어 시스템 및 알고리즘 초기화 부분
         self.pid = pidControl() # PID Control
-        self.vel_planning = VelocityPlanningFollowVehicle(self.target_velocity / 3.6, 1.5) # Velocity Control
+        self.vel_planning = VelocityPlanningFollowVehicle(self.target_velocity, time_gap=1.5) # Velocity Control
         self.pure_pursuit = pure_pursuit_no_npc() # Pure Pursuit control
         self.object_detector = object_detector() # Object Detection to avoid
 
         # 무한 루프: self.is_global_path가 True로 설정될때까지 계속 실행.
-        while True:
-            if self.is_global_path == True: # If you get the Global Path Information
-                self.velocity_list = self.vel_planning.control_velocity(self.path, self.object_msg) # Set velocity ,,
-                # 속도 프로파일 계산 후 아래 루프 실행
-                break
-            else:
-                pass
+        # while True:
+        #     if self.is_global_path == True: # If you get the Global Path Information
+        #         self.velocity_list = self.vel_planning.control_velocity(self.path, self.object_msg) # Set velocity ,,
+        #         # 속도 프로파일 계산 후 아래 루프 실행
+        #         break
+        #     else:
+        #         pass
 
         rate = rospy.Rate(30)  # 30hz
         print("path_info", self.is_path, "odom_info", self.is_odom, "status info", self.is_status)
@@ -81,8 +81,8 @@ class rule_based_planner:
             if self.is_path == True and self.is_odom == True and self.is_status == True: # Everything is OK
                 prev_time = time.time()
 
-                self.current_waypoint = self.pure_pursuit.get_current_waypoint(self.status_msg, self.global_path)
-                self.target_velocity = self.velocity_list[self.current_waypoint] * 3.6
+                # self.current_waypoint = self.pure_pursuit.get_current_waypoint(self.status_msg, self.global_path)
+                self.target_velocity = self.vel_planning.control_velocity(self.path, self.object_msg)
 
                 steering = self.pure_pursuit.calc_pure_pursuit()
 
