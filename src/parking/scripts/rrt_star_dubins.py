@@ -30,7 +30,7 @@ def pify(alpha):
     return v
 
 def degrees_to_radians(degrees):
-    return degrees * (np.pi / 180)
+    return degrees * (np.pi / 180.0)
 
 class RRTStar(object):
     def __init__(self, start, goal, config):
@@ -208,16 +208,28 @@ if __name__ == '__main__':
     start = [start_position[0], start_position[1], start_yaw]
 
     #goal 포지션
-    goal_position = [3.25, 1022.73]
+    goal_position = [5.25, 1021.73]
     goal_yaw = degrees_to_radians(-120.769) #-120.769
     goal = [goal_position[0], goal_position[1], goal_yaw]
 
 
-    #obstacle 토픽 아니면 시나리오로 받기
+    # obstacle 토픽 아니면 시나리오로 받기
+    # 시나리오에서 장애물을 불러오면, 사이즈를 수기로 입력해야함.
+    # DataID = 40100019 -> 주차된 차량 Rectangle Obstacle
+    # 40100003 -> 콘 circle Obstacle
     obstacles = []
+    car_size = [2.96, 1.069] # 4.96 , 2.069
     for object in objectList :
-        
-        pass
+        DataId = object['DataID']
+        DataPos = object['pos']
+        DataYaw = degrees_to_radians(float(object['rot']['yaw']))
+        DataX = DataPos['x']
+        DataY = DataPos['y']
+
+        if DataId == 40100019 :
+            obs = obstacle.RectangleObstacle(DataX,DataY,car_size[0],car_size[1],DataYaw)
+            obstacles.append(obs)
+
 
     #그리기
     for obs in obstacles:
@@ -227,8 +239,8 @@ if __name__ == '__main__':
     config = {
         "eta": 10.0,
         #gamma = 최적화 범위
-        "gamma_rrt_star": 10.0,
-        "goal_sample_rate": 0.05,
+        "gamma_rrt_star": 100.0,
+        "goal_sample_rate": 0.5,
     }
 
     rrt_star = RRTStar(start, goal, config)
@@ -239,7 +251,7 @@ if __name__ == '__main__':
     dubins = Dubins()
     kappa = 1/2.0
 
-    for i in range(500):
+    for i in range(5000):
         rand_node_state = rrt_star.sample_free(obstacles, space)
         # plt.plot(rand_node[0], rand_node[1], '.')
         
