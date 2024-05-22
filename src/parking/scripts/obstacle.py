@@ -23,8 +23,9 @@ class Obstacle(object):
 
 class RectangleObstacle(object):
     def __init__(self, center_x, center_y, width, height, angle):
-        self.x = center_x
-        self.y = center_y
+        self.gap = 1.25
+        self.x = center_x + np.cos(angle)* self.gap
+        self.y = center_y + np.sin(angle)* self.gap
         self.width = width
         self.height = height
         self.angle = angle
@@ -67,6 +68,7 @@ class RectangleObstacle(object):
 
         # 좌표 회전
         angle_rad = self.angle  # 각도를 라디안으로 변환
+
         cos_val = np.cos(angle_rad)
         sin_val = np.sin(angle_rad)
 
