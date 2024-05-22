@@ -196,7 +196,7 @@ if __name__ == '__main__':
     
     #parking lot space
     fig, ax = plt.subplots()
-    parkingSpacePos = ((-18.19,1032.92),(3.49,1074.75),(41.60,1053.83),(20.83,1004.84))
+    parkingSpacePos = ((-18.19,1031.92),(3.49,1074.75),(43.00,1053.83),(20.83,1004.84))
     parkingSpace = patches.Polygon(parkingSpacePos,facecolor="none",edgecolor="black",closed=True)
     ax.add_patch(parkingSpace)
     
@@ -224,16 +224,24 @@ if __name__ == '__main__':
     # DataID = 40100019 -> 주차된 차량 Rectangle Obstacle
     # 40100003 -> 콘 circle Obstacle
     obstacles = []
-    car_size = [2.96, 1.069] # 4.96 , 2.069
+    car_size = [4.96, 2.069] # 4.96 , 2.069
+    obstacleId = {
+        'car' : 40100019,
+        'corn' : 40100003
+    }
     for object in objectList :
         DataId = object['DataID']
         DataPos = object['pos']
-        DataYaw = degrees_to_radians(float(object['rot']['yaw']))
+        DataYaw = pify(degrees_to_radians(float(object['rot']['yaw'])))
+        
         DataX = DataPos['x']
         DataY = DataPos['y']
 
-        if DataId == 40100019 :
+        if DataId == obstacleId['car'] :
             obs = obstacle.RectangleObstacle(DataX,DataY,car_size[0],car_size[1],DataYaw)
+            obstacles.append(obs)
+        elif DataId == obstacleId['corn'] :
+            obs = obstacle.Obstacle(DataX,DataY,0.5)
             obstacles.append(obs)
 
 
@@ -245,7 +253,7 @@ if __name__ == '__main__':
     config = {
         "eta": 10.0,
         #gamma = 최적화 범위
-        "gamma_rrt_star": 100.0,
+        "gamma_rrt_star": 2.0,
         "goal_sample_rate": 0.5,
     }
 
@@ -259,7 +267,7 @@ if __name__ == '__main__':
 
     for i in range(1):
         rand_node_state = rrt_star.sample_free(obstacles, space)
-        # plt.plot(rand_node[0], rand_node[1], '.')
+        plt.plot(rand_node_state[0], rand_node_state[1], '.')
         
         nearest_node_id = rrt_star.get_nearest(rand_node_state)
         nearest_node_state = rrt_star.get_node(nearest_node_id)
