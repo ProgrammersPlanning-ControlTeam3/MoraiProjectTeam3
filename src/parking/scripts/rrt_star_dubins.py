@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import obstacle as obstacle
+import rectangle as Rectangle
 
 """
 1. 출발지점과 골 그리고 주차장 범위 정하기 (완)
@@ -49,16 +50,18 @@ class RRTStar(object):
 
         self.start = start
         self.goal = goal
-
         self.config = config
 
+    #space 조정 필요.
     def sample_free(self, obstacles, space):
         min_x, max_x, min_y, max_y = space
+
         #goal 과의 거리가 정해진 값보다 멀다면 랜덤 노드생성
         if np.random.rand() > self.config["goal_sample_rate"]:
             rand_x = np.random.uniform(min_x, max_x)
             rand_y = np.random.uniform(min_y, max_y)
             rand_yaw = np.random.uniform(0, 2*np.pi)
+
             return np.array([rand_x, rand_y, rand_yaw])
 
         else:
@@ -196,7 +199,8 @@ if __name__ == '__main__':
     
     #parking lot space
     fig, ax = plt.subplots()
-    parkingSpacePos = ((-18.19,1031.92),(3.49,1074.75),(43.00,1053.83),(20.83,1004.84))
+    p1,p2,p3,p4 = (-18.19,1031.92),(3.49,1074.75),(43.00,1053.83),(20.83,1004.84)
+    parkingSpacePos = (p1,p2,p3,p4)
     parkingSpace = patches.Polygon(parkingSpacePos,facecolor="none",edgecolor="black",closed=True)
     ax.add_patch(parkingSpace)
     
@@ -206,7 +210,9 @@ if __name__ == '__main__':
 
     #plot 공간
     #사각형 공간으로 바꿔야함.
-    space = [min_x, max_x, min_y, max_y]
+    # space = [min_x, max_x, min_y, max_y]
+    space = [-18.19, 43.00, 1004.84, 1074.75]
+    parking_Rectangle = Rectangle.Rectangle(p1,p2,p3,p4)
 
     #시작지점 설정
     start_position = [-7.34284, 1062.8048]
@@ -244,6 +250,7 @@ if __name__ == '__main__':
             obs = obstacle.Obstacle(DataX,DataY,0.5)
             obstacles.append(obs)
 
+    # obstacles = []
 
     #그리기
     for obs in obstacles:
@@ -254,7 +261,7 @@ if __name__ == '__main__':
         "eta": 10.0,
         #gamma = 최적화 범위
         "gamma_rrt_star": 2.0,
-        "goal_sample_rate": 0.5,
+        "goal_sample_rate": 0.05,
     }
 
     rrt_star = RRTStar(start, goal, config)
@@ -265,10 +272,15 @@ if __name__ == '__main__':
     dubins = Dubins()
     kappa = 1/2.0
 
-    for i in range(1):
+    for i in range(500):
         rand_node_state = rrt_star.sample_free(obstacles, space)
+        # plt.plot(rand_node_state[0], rand_node_state[1], '.')
+
+        while not parking_Rectangle.is_inside(rand_node_state) :
+            rand_node_state = rrt_star.sample_free(obstacles, space)
+
         plt.plot(rand_node_state[0], rand_node_state[1], '.')
-        
+
         nearest_node_id = rrt_star.get_nearest(rand_node_state)
         nearest_node_state = rrt_star.get_node(nearest_node_id)
         new_node_state = rrt_star.steer(nearest_node_state, rand_node_state)
