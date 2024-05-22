@@ -2,7 +2,7 @@ import numpy as np
 
 def get_frenet(x, y, mapx, mapy):
     next_wp = next_waypoint(x, y, mapx, mapy)
-    prev_wp = next_wp - 1
+    prev_wp = next_wp - 1 if next_wp > 0 else len(mapx) - 1
 
     n_x = mapx[next_wp] - mapx[prev_wp]
     n_y = mapy[next_wp] - mapy[prev_wp]
@@ -10,7 +10,6 @@ def get_frenet(x, y, mapx, mapy):
     x_y = y - mapy[prev_wp]
 
     if n_x == 0 and n_y == 0:
-        # Handle the special case where the waypoints are the same
         proj_x = x_x
         proj_y = x_y
         proj_norm = 0
@@ -19,7 +18,6 @@ def get_frenet(x, y, mapx, mapy):
         proj_x = proj_norm * n_x
         proj_y = proj_norm * n_y
 
-    #-------- get frenet d
     frenet_d = get_dist(x_x, x_y, proj_x, proj_y)
 
     ego_vec = [x - mapx[prev_wp], y - mapy[prev_wp], 0]
@@ -29,7 +27,6 @@ def get_frenet(x, y, mapx, mapy):
     if d_cross[-1] > 0:
         frenet_d = -frenet_d
 
-    #-------- get frenet s
     frenet_s = 0
     for i in range(prev_wp):
         frenet_s += get_dist(mapx[i], mapy[i], mapx[i + 1], mapy[i + 1])
@@ -41,7 +38,7 @@ def get_frenet(x, y, mapx, mapy):
 def get_cartesian(s, d, mapx, mapy, maps):
     prev_wp = 0
 
-    while (s > maps[prev_wp + 1]) and (prev_wp < len(maps) - 2):
+    while (prev_wp < len(maps) - 2) and (s > maps[prev_wp + 1]):
         prev_wp += 1
 
     next_wp = np.mod(prev_wp + 1, len(mapx))
@@ -51,13 +48,11 @@ def get_cartesian(s, d, mapx, mapy, maps):
 
     heading = np.arctan2(dy, dx)  # [rad]
 
-    # the x, y, s along the segment
     seg_s = s - maps[prev_wp]
-
     seg_x = mapx[prev_wp] + seg_s * np.cos(heading)
     seg_y = mapy[prev_wp] + seg_s * np.sin(heading)
 
-    perp_heading = heading + 90 * np.pi / 180
+    perp_heading = heading + np.pi / 2
     x = seg_x + d * np.cos(perp_heading)
     y = seg_y + d * np.sin(perp_heading)
 

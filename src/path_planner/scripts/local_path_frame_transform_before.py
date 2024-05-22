@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import rospy
-from math import pi
+from math import cos, sin, sqrt, pow, pi
 import numpy as np
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
 from morai_msgs.msg import EgoVehicleStatus
-from frame_transform import get_frenet, get_cartesian, get_dist
+from frame_transform import *
 
 class PathPub:
     def __init__(self):
@@ -30,7 +30,23 @@ class PathPub:
         rate = rospy.Rate(10)  # 10hz
         while not rospy.is_shutdown():
             if self.is_status and self.global_path_msg.poses:
-                local_path_msg = self.create_local_path_msg()
+                local_path_msg = Path()
+                local_path_msg.header.frame_id = 'map'
+
+                x = self.x
+                y = self.y
+                yaw = self.yaw
+
+                current_waypoint = self.get_closest_waypoint(x, y)
+                if current_waypoint != -1:
+                    local_path_points = self.generate_local_path(x, y, yaw, current_waypoint)
+                    for point in local_path_points:
+                        tmp_pose = PoseStamped()
+                        tmp_pose.pose.position.x = point[0]
+                        tmp_pose.pose.position.y = point[1]
+                        tmp_pose.pose.orientation.w = 1
+                        local_path_msg.poses.append(tmp_pose)
+
                 self.local_path_pub.publish(local_path_msg)
             rate.sleep()
 
@@ -43,25 +59,17 @@ class PathPub:
     def global_path_callback(self, msg):
         self.global_path_msg = msg
 
-    def create_local_path_msg(self):
-        local_path_msg = Path()
-        local_path_msg.header.frame_id = 'map'
+    def get_closest_waypoint(self, x, y):
+        min_dis = float('inf')
+        closest_waypoint = -1
+        for i, waypoint in enumerate(self.global_path_msg.poses):
+            distance = sqrt(pow(x - waypoint.pose.position.x, 2) + pow(y - waypoint.pose.position.y, 2))
+            if distance < min_dis:
+                min_dis = distance
+                closest_waypoint = i
+        return closest_waypoint
 
-        x = self.x
-        y = self.y
-        yaw = self.yaw
-
-        local_path_points = self.generate_local_path(x, y, yaw)
-        for point in local_path_points:
-            tmp_pose = PoseStamped()
-            tmp_pose.pose.position.x = point[0]
-            tmp_pose.pose.position.y = point[1]
-            tmp_pose.pose.orientation.w = 1
-            local_path_msg.poses.append(tmp_pose)
-
-        return local_path_msg
-
-    def generate_local_path(self, x, y, yaw):
+    def generate_local_path(self, x, y, yaw, start_idx):
         local_path_points = []
 
         mapx = [pose.pose.position.x for pose in self.global_path_msg.poses]
@@ -72,10 +80,12 @@ class PathPub:
 
         s, d = get_frenet(x, y, mapx, mapy)
 
-        s_target = s + self.local_path_size 
-        d_target = d 
+        end_idx = min(start_idx + self.local_path_size, len(self.global_path_msg.poses))
 
-        T = 1.0 
+        target_point = self.global_path_msg.poses[end_idx - 1].pose.position
+        s_target, d_target = get_frenet(target_point.x, target_point.y, mapx, mapy)
+
+        T = 1.0
         s_coeff = self.quintic_polynomial_coeffs(s, 0, 0, s_target, 0, 0, T)
         d_coeff = self.quintic_polynomial_coeffs(d, 0, 0, d_target, 0, 0, T)
 
@@ -83,15 +93,10 @@ class PathPub:
             t = i * (T / self.local_path_size)
             s_val = self.quintic_polynomial_value(s_coeff, t)
             d_val = self.quintic_polynomial_value(d_coeff, t)
-            
-            if s_val > maps[-1]:
-                s_val = maps[-1]
-            
             point_x, point_y, _ = get_cartesian(s_val, d_val, mapx, mapy, maps)
             local_path_points.append((point_x, point_y))
 
         return local_path_points
-
 
     def quintic_polynomial_coeffs(self, xs, vxs, axs, xe, vxe, axe, T):
         A = np.array([
@@ -108,6 +113,8 @@ class PathPub:
 
     def quintic_polynomial_value(self, coeffs, t):
         return coeffs[0]*t**5 + coeffs[1]*t**4 + coeffs[2]*t**3 + coeffs[3]*t**2 + coeffs[4]*t + coeffs[5]
+
+
 
 if __name__ == '__main__':
     try:
