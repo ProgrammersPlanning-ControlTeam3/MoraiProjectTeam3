@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def get_frenet(x, y, mapx, mapy):
     next_wp = next_waypoint(x, y, mapx, mapy)
     prev_wp = next_wp - 1
@@ -10,9 +9,15 @@ def get_frenet(x, y, mapx, mapy):
     x_x = x - mapx[prev_wp]
     x_y = y - mapy[prev_wp]
 
-    proj_norm = (x_x * n_x + x_y * n_y) / (n_x * n_x + n_y * n_y)
-    proj_x = proj_norm * n_x
-    proj_y = proj_norm * n_y
+    if n_x == 0 and n_y == 0:
+        # Handle the special case where the waypoints are the same
+        proj_x = x_x
+        proj_y = x_y
+        proj_norm = 0
+    else:
+        proj_norm = (x_x * n_x + x_y * n_y) / (n_x * n_x + n_y * n_y)
+        proj_x = proj_norm * n_x
+        proj_y = proj_norm * n_y
 
     #-------- get frenet d
     frenet_d = get_dist(x_x, x_y, proj_x, proj_y)
@@ -42,7 +47,7 @@ def get_cartesian(s, d, mapx, mapy, maps):
     next_wp = np.mod(prev_wp + 1, len(mapx))
 
     dx = (mapx[next_wp] - mapx[prev_wp])
-    dy = (mapy[next_wp] - mapy[prev_wp])  # 수정된 부분
+    dy = (mapy[next_wp] - mapy[prev_wp]) 
 
     heading = np.arctan2(dy, dx)  # [rad]
 
@@ -50,14 +55,13 @@ def get_cartesian(s, d, mapx, mapy, maps):
     seg_s = s - maps[prev_wp]
 
     seg_x = mapx[prev_wp] + seg_s * np.cos(heading)
-    seg_y = mapy[prev_wp] + seg_s * np.sin(heading)  # 수정된 부분
+    seg_y = mapy[prev_wp] + seg_s * np.sin(heading)
 
     perp_heading = heading + 90 * np.pi / 180
     x = seg_x + d * np.cos(perp_heading)
     y = seg_y + d * np.sin(perp_heading)
 
     return x, y, heading
-
 
 def next_waypoint(x, y, mapx, mapy):
     closest_wp = get_closest_waypoints(x, y, mapx, mapy)
