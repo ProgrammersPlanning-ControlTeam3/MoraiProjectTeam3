@@ -14,7 +14,7 @@ import obstacle as obstacle
 """
 1. 출발지점과 골 그리고 주차장 범위 정하기 (완)
 2. 주차범위 시각화 하기
-3. obstacle 불러오기
+3. obstacle 불러오기 (완)
 4.
 
 """
@@ -195,6 +195,12 @@ if __name__ == '__main__':
     min_y, max_y = 1005.84, 1076.51
     
     #parking lot space
+    fig, ax = plt.subplots()
+    parkingSpacePos = ((-18.19,1032.92),(3.49,1074.75),(41.60,1053.83),(20.83,1004.84))
+    parkingSpace = patches.Polygon(parkingSpacePos,facecolor="none",edgecolor="black",closed=True)
+    ax.add_patch(parkingSpace)
+    
+    #object from Scenario
     scenario = ScenarioLoader()
     objectList = scenario.getObject()
 
@@ -251,7 +257,7 @@ if __name__ == '__main__':
     dubins = Dubins()
     kappa = 1/2.0
 
-    for i in range(5000):
+    for i in range(1):
         rand_node_state = rrt_star.sample_free(obstacles, space)
         # plt.plot(rand_node[0], rand_node[1], '.')
         
