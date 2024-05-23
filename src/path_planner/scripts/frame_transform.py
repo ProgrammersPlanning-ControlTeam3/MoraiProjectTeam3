@@ -67,11 +67,14 @@ def next_waypoint(x, y, mapx, mapy):
     angle = np.abs(np.arctan2(np.sin(heading), np.cos(heading)))
 
     if angle > np.pi / 4:
-        closest_wp += 1
-        if closest_wp == len(mapx):
-            closest_wp = 0
+        next_wp = (closest_wp + 1) % len(mapx)
+        dist_to_next_wp = get_dist(x, y, mapx[next_wp], mapy[next_wp])
+
+        if dist_to_next_wp < 5:
+            closest_wp = next_wp
 
     return closest_wp
+
 
 def get_closest_waypoints(x, y, mapx, mapy):
     min_len = 1e10

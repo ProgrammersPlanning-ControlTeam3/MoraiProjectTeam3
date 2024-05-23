@@ -72,7 +72,7 @@ class PathPub:
 
         s, d = get_frenet(x, y, mapx, mapy)
 
-        s_target = s + self.local_path_size
+        s_target = s + min(self.local_path_size, maps[-1] - s)
 
         d_target = None
         for i in range(1, len(maps)):
