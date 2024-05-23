@@ -5,14 +5,16 @@ import rospy
 from math import pi
 import numpy as np
 from geometry_msgs.msg import PoseStamped
-from nav_msgs.msg import Path
+from nav_msgs.msg import Path, Odometry
 from morai_msgs.msg import EgoVehicleStatus
+from tf.transformations import euler_from_quaternion
 from frame_transform import get_frenet, get_cartesian, get_dist
 
 class PathPub:
     def __init__(self):
         rospy.init_node('path_pub', anonymous=True)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
+        rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
 
         self.local_path_pub = rospy.Publisher('/local_path', Path, queue_size=1)
@@ -25,7 +27,6 @@ class PathPub:
 
         self.x = 0
         self.y = 0
-        self.yaw = 0
 
         rate = rospy.Rate(10)  # 10hz
         while not rospy.is_shutdown():
@@ -34,11 +35,17 @@ class PathPub:
                 self.local_path_pub.publish(local_path_msg)
             rate.sleep()
 
-    def status_callback(self, msg):
-        self.is_status = True
-        self.x = msg.position.x
-        self.y = msg.position.y
-        self.yaw = msg.heading * (pi / 180.0)
+    def odom_callback(self, msg):
+        self.is_status=True
+
+        self.x = msg.pose.pose.position.x
+        self.y = msg.pose.pose.position.y
+
+    # def status_callback(self, msg):
+    #     self.is_status = True
+    #     self.x = msg.position.x
+    #     self.y = msg.position.y
+    #     self.yaw = msg.heading * (pi / 180.0)
 
     def global_path_callback(self, msg):
         self.global_path_msg = msg
@@ -49,9 +56,8 @@ class PathPub:
 
         x = self.x
         y = self.y
-        yaw = self.yaw
 
-        local_path_points = self.generate_local_path(x, y, yaw)
+        local_path_points = self.generate_local_path(x, y)
         for point in local_path_points:
             tmp_pose = PoseStamped()
             tmp_pose.pose.position.x = point[0]
@@ -61,7 +67,7 @@ class PathPub:
 
         return local_path_msg
 
-    def generate_local_path(self, x, y, yaw):
+    def generate_local_path(self, x, y):
         local_path_points = []
 
         mapx = [pose.pose.position.x for pose in self.global_path_msg.poses]
