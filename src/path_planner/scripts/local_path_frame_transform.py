@@ -21,7 +21,7 @@ class PathPub:
         self.global_path_msg.header.frame_id = 'map'
 
         self.is_status = False
-        self.local_path_size = 65
+        self.local_path_size = 30
 
         self.x = 0
         self.y = 0
@@ -72,10 +72,18 @@ class PathPub:
 
         s, d = get_frenet(x, y, mapx, mapy)
 
-        s_target = s + self.local_path_size 
-        d_target = d 
+        s_target = s + self.local_path_size
 
-        T = 1.0 
+        d_target = None
+        for i in range(1, len(maps)):
+            if maps[i] >= s_target:
+                d_target = get_frenet(mapx[i], mapy[i], mapx, mapy)[1]
+                break
+
+        if d_target is None:
+            d_target = d
+
+        T = 1.0
         s_coeff = self.quintic_polynomial_coeffs(s, 0, 0, s_target, 0, 0, T)
         d_coeff = self.quintic_polynomial_coeffs(d, 0, 0, d_target, 0, 0, T)
 
@@ -83,15 +91,14 @@ class PathPub:
             t = i * (T / self.local_path_size)
             s_val = self.quintic_polynomial_value(s_coeff, t)
             d_val = self.quintic_polynomial_value(d_coeff, t)
-            
+
             if s_val > maps[-1]:
                 s_val = maps[-1]
-            
+
             point_x, point_y, _ = get_cartesian(s_val, d_val, mapx, mapy, maps)
             local_path_points.append((point_x, point_y))
 
         return local_path_points
-
 
     def quintic_polynomial_coeffs(self, xs, vxs, axs, xe, vxe, axe, T):
         A = np.array([
