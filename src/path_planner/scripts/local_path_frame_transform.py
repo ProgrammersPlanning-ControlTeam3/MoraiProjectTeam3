@@ -13,7 +13,7 @@ from frame_transform import get_frenet, get_cartesian, get_dist
 class PathPub:
     def __init__(self):
         rospy.init_node('path_pub', anonymous=True)
-        rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
+        # rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
 
