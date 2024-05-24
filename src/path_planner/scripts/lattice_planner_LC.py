@@ -5,8 +5,11 @@ import os, sys
 import rospy
 from math import cos, sin, pi, sqrt, pow, atan2
 from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
+from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList
 from geometry_msgs.msg import Point, PoseStamped, Point32
 from nav_msgs.msg import Path
+from std_msgs.msg import Int32
+
 import numpy as np
 
 
@@ -18,16 +21,26 @@ class latticePlanner:
         rospy.Subscriber("/local_path", Path, self.path_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
         rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_callback)
+        rospy.Subscriber('/Object_topic/tracked_object_pose_topic', TrackedObjectPoseList, self.object_info_callback)
+        rospy.Subscriber('/Object_topic/tracked_object_path_topic', PredictedObjectPathList, self.object_path_callback)
+        rospy.Subscriber('/Object_topic/deleted_object_id', Int32, self.deleted_object_callback)
+
 
         self.lattice_path_pub = rospy.Publisher('/lattice_path', Path, queue_size=1)
 
         self.is_path = False
         self.is_status = False
         self.is_obj = False
+        self.is_pose_received = False
+        self.object_pose = None
+        self.is_path_received = False
+        self.object_path = None
+        self.deleted_ids = set()
+
         rate = rospy.Rate(30)  # 30hz
         while not rospy.is_shutdown():
             if self.is_path and self.is_status and self.is_obj:
-                if self.checkObject(self.local_path, self.object_data):
+                if self.checkObject(self.local_path, self.object_data, self.object_path):
                     lattice_path = self.latticePlanner(self.local_path, self.status_msg)
                     lattice_path_index = self.collision_check(self.object_data, lattice_path)
 
@@ -37,17 +50,32 @@ class latticePlanner:
                     self.lattice_path_pub.publish(self.local_path)
             rate.sleep()
 
-    def checkObject(self, ref_path, object_data):
-        is_crash = False
-        for npc in object_data.npc_list:
-            for path in ref_path.poses:
-                dis = sqrt(pow(path.pose.position.x - npc.position.x, 2) + pow(path.pose.position.y - npc.position.y, 2))
-                # print(dis)
-                if dis < 2.35:  # 장애물의 좌표값이 지역 경로 상의 좌표값과의 직선거리가 2.35 미만일때 충돌이라 판단.
-                    is_crash = True
-                    break
 
-        return is_crash
+    def checkObject(self, ref_path, object_data, object_path):
+        def is_collision_distance(path_pose, obj_position, threshold):
+            dis = sqrt(pow(path_pose.pose.position.x - obj_position.x, 2) + pow(path_pose.pose.position.y - obj_position.y, 2))
+            return dis < threshold
+
+        def is_path_overlap(path_pose, predicted_pose, threshold):
+            dis = sqrt(pow(path_pose.pose.position.x - predicted_pose.x, 2) + pow(path_pose.pose.position.y - predicted_pose.y, 2))
+            return dis < threshold
+
+        # npc's position
+        for path in ref_path.poses:
+            for npc in object_data.npc_list:
+                if is_collision_distance(path, npc.position, 2.35):
+                    return True
+
+        # npc's predicted path
+        if object_path is not None:
+            for path in ref_path.poses:
+                for predicted_path in object_path.path_list:
+                    for predicted_pose in predicted_path.path:
+                        if is_path_overlap(path, predicted_pose, 2.35):  # 2.35는 임의의 임계값, 필요 시 조정
+                            return True
+
+        return False
+
 
     def collision_check(self, object_data, out_path):
         # TODO: (6) 생성된 충돌회피 경로 중 낮은 비용의 경로 선택
@@ -89,6 +117,17 @@ class latticePlanner:
         self.is_obj = True
         self.object_data = msg
 
+    def object_info_callback(self, msg):
+        self.is_pose_received=True
+        self.object_pose = msg
+
+    def object_path_callback(self, msg):
+        self.is_path_received=True
+        self.object_path = msg
+
+    def deleted_object_callback(self, msg):
+        self.deleted_ids.add(msg.data)
+
     def latticePlanner(self, ref_path, vehicle_status):
         out_path = []
         vehicle_pose_x = vehicle_status.position.x
@@ -97,8 +136,12 @@ class latticePlanner:
 
         look_distance = int(vehicle_velocity * 0.2 * 2)
 
-        if look_distance < 30:
-            look_distance = 30
+        if look_distance < 20:
+            look_distance = 20
+
+        # ref_path.poses의 길이를 고려하여 look_distance 조정
+        max_look_distance = len(ref_path.poses) // 2 - 1
+        look_distance = min(look_distance, max_look_distance)
 
         if len(ref_path.poses) > look_distance:
             # TODO: (3) 좌표 변환 행렬 생성

@@ -23,7 +23,7 @@ class PathPub:
         self.global_path_msg.header.frame_id = 'map'
 
         self.is_status = False
-        self.local_path_size = 30
+        self.local_path_size = 50
 
         self.x = 0
         self.y = 0
