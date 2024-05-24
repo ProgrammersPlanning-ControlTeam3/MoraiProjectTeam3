@@ -10,6 +10,7 @@ from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry, Path
 from morai_msgs.msg import EgoVehicleStatus
 
+
 class pure_pursuit_no_npc:
     def __init__(self):
 
@@ -202,21 +203,14 @@ class pure_pursuit:
         # print(steering)
         return steering
 
-class stanley :
+class stanley:
     def __init__(self):
         # rospy.init_node('stanley', anonymous=True)
 
-        #TODO: (1) subscriber, publisher 선언
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
         rospy.Subscriber("/local_path", Path, self.path_callback)
-        # rospy.Subscriber("/lattice_path", Path, self.path_callback)
-
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
-        rospy.Subscriber("/Ego_topic",EgoVehicleStatus, self.status_callback)
-        # self.ctrl_cmd_pub = rospy.Publisher(name='ctrl_cmd_0',CtrlCmd, queue_size=1)
-
-        # self.ctrl_cmd_msg = CtrlCmd()
-        # self.ctrl_cmd_msg.longlCmdType = 1
+        rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
 
         self.is_path = False
         self.is_odom = False
@@ -225,187 +219,114 @@ class stanley :
 
         self.is_look_forward_point = True
 
-        self.forward_point = Point() #forward point
-        self.current_position = Point() # current Point
+        self.forward_point = Point()
+        self.current_position = Point()
 
-        self.target_velocity = 40 # Target Velocity in m/s
-        '''
-         Tunning Gain Constant
-        '''
-        self.k=0.9 # Stanley Gain
-        self.k_psi=0.9 # For heading Error
-        self.k_y=0.8 # For CTR Error
+        self.target_velocity = 40  # Target Velocity in m/s
 
-        # self.k=1.1 # Stanley Gain
-        # self.k_psi=1.2 # For heading Error
-        # self.k_y=0.8 # For CTR Error
-        '''
-         Restrained Steering Angle
-        '''
-        # self.max_steering=0.7
-        # self.min_steering=-0.7
-        # self.prev_steering=0.0 # one step ago
-        
-        '''
-        PID GAIN, PARAM
-        '''
-        self.prev_steering=0.0
+        self.k = 1.4  # Stanley Gain
+        self.k_psi = 0.8  # For heading Error
+        self.k_y = 1  # For CTR Error
 
-        self.error=0.0
-        self.prev_error=0.0
+        self.max_cross_track_error = 1.0  # Maximum cross track error
 
-        self.p_gain=1.0
-        self.d_gain=1.2
-        # two step ago
-        # self.alpha = 0.5  # Smoothing factor
-        # self.prev_CTR = 0.0
 
-        ## Limited Steering Angle
-
-        ## Testing
-        # self.k=0.9 # Stanley Gain
-        # self.k_psi=1.2 # For heading Error
-        # self.k_y=1.1 # For CTR Error
-        # # self.alpha = 0.5  # Smoothing factor
-        # # self.prev_CTR = 0.0
-
-        self.vehicle_length = 5.155 # Vehilce Length,,, you have to change it
-        self.lfd = 10 # Look forward Distance
+        self.vehicle_length = 5.155  # Vehicle Length
+        self.lfd = 10  # Look forward Distance
         if self.vehicle_length is None or self.lfd is None:
             print("you need to change values at line 57~58 ,  self.vegicle_length , lfd")
             exit()
-        # self.min_lfd = 10
-        # self.max_lfd = 30
-        # self.lfd_gain = 0.78
-    '''
 
-    Callback Function
-    path: path infox
-    odom: yaw, position info
-    status: Current status
+    def path_callback(self, msg):
+        self.is_path = True
+        self.path = msg
 
-    '''
+    def odom_callback(self, msg):
+        self.is_odom = True
+        odom_quaternion = (
+            msg.pose.pose.orientation.x,
+            msg.pose.pose.orientation.y,
+            msg.pose.pose.orientation.z,
+            msg.pose.pose.orientation.w,
+        )
+        _, _, self.vehicle_yaw = euler_from_quaternion(odom_quaternion)
+        self.current_position.x = msg.pose.pose.position.x
+        self.current_position.y = msg.pose.pose.position.y
 
-    def path_callback(self,msg):
-        self.is_path=True
-        self.path=msg
+    def status_callback(self, msg):  ## Vehicle Status Subscriber
+        self.is_status = True
+        self.status_msg = msg
 
-
-    def odom_callback(self,msg):
-        self.is_odom=True
-        odom_quaternion=(msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z,msg.pose.pose.orientation.w)
-        _,_,self.vehicle_yaw=euler_from_quaternion(odom_quaternion)
-        self.current_position.x=msg.pose.pose.position.x
-        self.current_position.y=msg.pose.pose.position.y
-
-    def status_callback(self,msg): ## Vehicl Status Subscriber
-        self.is_status=True
-        self.status_msg=msg
-
-    def global_path_callback(self,msg):
+    def global_path_callback(self, msg):
         self.global_path = msg
         self.is_global_path = True
 
-    def get_current_waypoint(self,ego_status,global_path):
+    def get_current_waypoint(self, ego_status, global_path):
         min_dist = float('inf')
-        currnet_waypoint = -1
-        for i,pose in enumerate(global_path.poses):
+        current_waypoint = -1
+        for i, pose in enumerate(global_path.poses):
             dx = ego_status.position.x - pose.pose.position.x
             dy = ego_status.position.y - pose.pose.position.y
 
-            dist = sqrt(pow(dx,2)+pow(dy,2))
-            if min_dist > dist :
+            dist = sqrt(pow(dx, 2) + pow(dy, 2))
+            if min_dist > dist:
                 min_dist = dist
-                currnet_waypoint = i
-        return currnet_waypoint
+                current_waypoint = i
+        return current_waypoint
 
-    '''
-
-    Calculated "Steering" Angle for lateral control
-
-    '''
     def calc_stanley_control(self):
-            # Initializing Steering Angle
-            steering = 0
-            self.control_time=0.02 # Same as PID Controller System time
+        if not self.is_global_path or not self.is_odom:
+            return 0.0  # No control if path or odom is not available
 
-            if not self.is_global_path or not self.is_odom:
-                return 0.0 # No control if path or odom is not available
-            # k = 1  # Stanley gain
-            min_distance = float('inf')
-            nearest_idx = -0.0
+        min_distance = float('inf')
+        nearest_idx = -0.0
 
             # Find the point on the path closest to the vehicle
-            for i, pose in enumerate(self.global_path.poses):
-                dx = self.current_position.x - pose.pose.position.x
-                dy = self.current_position.y - pose.pose.position.y
-                distance = sqrt(dx ** 2 + dy ** 2)
-                if distance < min_distance:
-                    min_distance = distance
-                    nearest_idx = i
+        for i, pose in enumerate(self.global_path.poses):
+            dx = self.current_position.x - pose.pose.position.x
+            dy = self.current_position.y - pose.pose.position.y
+            distance = sqrt(dx ** 2 + dy ** 2)
+            if distance < min_distance:
+                min_distance = distance
+                nearest_idx = i
 
-            # cross track error
-            nearest_point = self.global_path.poses[nearest_idx].pose.position
-            dx = self.current_position.x - nearest_point.x
-            dy = self.current_position.y - nearest_point.y
-            cos_yaw = cos(self.vehicle_yaw)
-            sin_yaw = sin(self.vehicle_yaw)
-            cross_track_error = dx * sin_yaw - dy * cos_yaw
+        # Cross track error
+        nearest_point = self.global_path.poses[nearest_idx].pose.position
+        dx = self.current_position.x - nearest_point.x
+        dy = self.current_position.y - nearest_point.y
+        cos_yaw = cos(self.vehicle_yaw)
+        sin_yaw = sin(self.vehicle_yaw)
+        cross_track_error = dx * sin_yaw - dy * cos_yaw
 
-            # heading error ( Considering Look Ahead Distance )
-            dx = self.global_path.poses[nearest_idx + 3].pose.position.x - self.global_path.poses[nearest_idx].pose.position.x
-            dy = self.global_path.poses[nearest_idx + 3].pose.position.y - self.global_path.poses[nearest_idx].pose.position.y
-            # heading_error = atan2(dy, dx) - self.vehicle_yaw
-            path_heading = atan2(dy, dx)
-            heading_error = path_heading - self.vehicle_yaw
-            # rospy.loginfo("heading_error: %s", heading_error)
-            # rospy.loginfo("cross_track_error: %s", cross_track_error)
+        cross_track_error = np.clip(cross_track_error, -self.max_cross_track_error, self.max_cross_track_error)
 
-            # Calculate steering using Stanley method
-            '''
+        path_point = self.global_path.poses[nearest_idx].pose.position
+        path_point_local_x = cos(self.vehicle_yaw) * (path_point.x - self.current_position.x) + sin(self.vehicle_yaw) * (path_point.y - self.current_position.y)
+        path_point_local_y = -sin(self.vehicle_yaw) * (path_point.x - self.current_position.x) + cos(self.vehicle_yaw) * (path_point.y - self.current_position.y)
 
-             Steering Angle : Heading Error + CTR
-             For Low velocity Added K_s Term
-             For the precise control, we added the control term
+        if path_point_local_y > 0:
+            cross_track_error = abs(cross_track_error)
+        else:
+            cross_track_error = -abs(cross_track_error)
 
-            '''
-            CTR = atan2(self.k * cross_track_error, self.target_velocity)
-        
-            # # Apply smoothing to CTR value
-            # raw_CTR = atan2(self.k * cross_track_error, self.target_velocity)
+        lookahead_idx = nearest_idx + 8  # Look ahead points
+        if lookahead_idx >= len(self.global_path.poses):
+            lookahead_idx = len(self.global_path.poses) - 1
+        dx = self.global_path.poses[lookahead_idx].pose.position.x - self.global_path.poses[nearest_idx].pose.position.x
+        dy = self.global_path.poses[lookahead_idx].pose.position.y - self.global_path.poses[nearest_idx].pose.position.y
+        path_heading = atan2(dy, dx)
+        heading_error = path_heading - self.vehicle_yaw
 
-            # CTR = self.alpha * raw_CTR + (1 - self.alpha) * self.prev_CTR
-            # self.prev_CTR = CTR
+        # Normalize heading error to the range [-pi, pi]
+        while heading_error > pi:
+            heading_error -= 2 * pi
+        while heading_error < -pi:
+            heading_error += 2 * pi
 
-            # # Apply a limit to the CTR change
-            # max_CTR_change = 0.005  # Change this value as needed
-            # CTR = max(min(CTR, self.prev_CTR + max_CTR_change), self.prev_CTR - max_CTR_change)
+        # Calculate steering using Stanley method
+        CTR = atan2(self.k * cross_track_error, self.target_velocity)
 
+        # Desired input
+        steering = self.k_psi * heading_error + self.k_y * CTR
 
-            print("CTR Error: ", CTR)
-            #Desired Input
-            steering = self.k_psi*heading_error + self.k_y * CTR
-            # '''
-            #  Combined PID + Stanley
-            # '''
-            # self.error = steering - self.prev_steering
-            # steering = self.p_gain * self.error + self.d_gain * (self.error - self.prev_error) / self.control_time
-            # self.prev_steering=steering
-            # self.prev_error=self.error
-
-
-            '''
-             Test for Limiting Steering Difference
-            '''
-            # if steering-self.prev_steering>0.1:
-            #     steering=self.prev_steering+0.1
-            # elif self.prev_steering-steering>0.1:
-            #     steering=self.prev_steering-0.1
-            # else:
-            #     steering=steering
-            # self.prev_steering=steering
-            # print("previous steering value is , ", self.prev_steering)
-            ## Clip the Steering Angle
-            rospy.loginfo("steering: %s", steering)
-
-            return steering
+        return steering
