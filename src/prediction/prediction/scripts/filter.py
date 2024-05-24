@@ -122,7 +122,7 @@ class IMM_filter():
             M (np.ndarray): 전이 확률 행렬
         """
         self.filters = filters
-        self.mu = mu
+        self.mu = mu # 분산
         self.M = M
         self.N = len(filters)
 
@@ -236,8 +236,9 @@ class IMM_filter():
                 f.predict()
 
                 likelihood[j] = (f.P[0, 0] + f.P[1, 1])
-
-            y = np.zeros(self.x.shape)
+            # print("Shape of self.x:", self.x.shape)
+            y = np.zeros(self.x.shape) # x 와 같은 행렬 차원이 되도록 설정
+            # y=np.zeros(5,1)
             mu = mM * likelihood
             mu /= np.sum(mu)
             mM = np.dot(mu, self.M)
@@ -249,7 +250,9 @@ class IMM_filter():
 
             # 예측된 상태 벡터를 결과 리스트에 추가합니다.
             for f, m_ in zip(filters, mu):
-                y[0:5] += f.x[0:5] * m_
+                # print("m_ is ", m_.shape)
+                # print("f.x is ", f.x[0:5].shape)
+                y[0:5] += m_ * np.reshape(f.x[0:5], (5,1))
                 if len(f.x) > 5 and len(y) > 5:
                     y[5] = f.x[5]
             X.append(y)
@@ -280,14 +283,18 @@ class IMM_filter():
         # 병합된 상태 벡터를 계산합니다.
         self.x.fill(0)
         for f, mu in zip(self.filters, self.mu):
-            self.x[0:5] += f.x[0:5] * mu
+            self.x[0:5] += np.reshape(f.x[0:5], (5,1)) * mu
             if len(f.x) > 5:
                 self.x[5] = f.x[5]
 
         # 병합된 공분산 행렬을 계산합니다.
         self.P.fill(0)
         for f, mu in zip(self.filters, self.mu):
-            y = f.x[0:5] - self.x[0:5]
+            y = np.reshape(f.x[0:5], (5,1)) - self.x[0:5]
+            # print("f.x shape is is is!!!", f.x[0:5].shape)
+            # print(" X shape is ", self.x[0:5].shape)
+            # print("y shape is... ", y.shape)
+            # print("f.P[0:5, 0:5] is ...", f.P[0:5, 0:5].shape)
             self.P[0:5, 0:5] += mu * (np.outer(y, y) + f.P[0:5, 0:5])
             if len(f.x) > 5:
                 self.P[5, 5] = (f.x[5]-self.x[5])**2+f.P[5, 5]
