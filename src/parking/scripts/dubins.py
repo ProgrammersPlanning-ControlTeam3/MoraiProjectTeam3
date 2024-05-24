@@ -33,11 +33,13 @@ class DubinsControl(object):
 
 
 class Dubins(object):
+    #init
     def __init__(self):
         self.constant = {
             "dubins_zero": -1e-9,
             "dubins_eps": 1e-6
         }
+
 
     def dubinsLSL(self, d, alpha, beta):
         ca, sa = np.cos(alpha), np.sin(alpha)
@@ -218,14 +220,20 @@ class Dubins(object):
 if __name__ == '__main__':
     #np.random.seed(7468)
 
-    kappa_ = 1./6
+    kappa_ = 1./2.0
     dubins = Dubins()
 
     # dubins.dubins(d=10.0, alpha=0.1, beta=0.1)
+
+    # test_point_1=  [1,1, 0.25 * np.pi]
+    # test_point_2=  [2,2, 0.25 * np.pi]
+
+    #start point
     sx, sy = np.random.uniform(-5, 0, size=2)
     stheta = np.random.uniform(0, np.pi * 2)
     start_state = [sx, sy, stheta]
 
+    #goal point
     gx, gy = np.random.uniform(5, 15, size=2)
     gtheta = np.random.uniform(0, np.pi * 2)
     goal_state = [gx, gy, gtheta]
@@ -233,6 +241,7 @@ if __name__ == '__main__':
     cartesian_path, controls, dubins_path = dubins.plan(start_state, goal_state, kappa_)
     path_x, path_y, path_yaw = cartesian_path
 
+    print(dubins_path)
     plt.plot(sx, sy, 'ro')
     plt.plot(gx, gy, 'rx')
     plt.plot(path_x, path_y, 'r-')
