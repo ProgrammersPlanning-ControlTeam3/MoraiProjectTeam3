@@ -18,7 +18,16 @@ import rectangle as Rectangle
 3. obstacle 불러오기 (완)
 4.
 
+###################차량 스펙########
+max wheel Angle : -35~ 35
+Length : 5.205m
+Width : 1.495m
+Wheelbase : 3.16 m
 """
+
+kappa =  1.5/2.0
+#g90 최소회전반경 r = 4.51
+
 def twopify(alpha):
     return alpha - np.pi * 2 * np.floor(alpha / (np.pi * 2))
 
@@ -34,6 +43,7 @@ def degrees_to_radians(degrees):
     return degrees * (np.pi / 180.0)
 
 class RRTStar(object):
+    #start, goal
     def __init__(self, start, goal, config):
         self.G = nx.DiGraph()
 
@@ -52,11 +62,12 @@ class RRTStar(object):
         self.goal = goal
         self.config = config
 
-    #space 조정 필요.
+    #랜덤 노드 생성
     def sample_free(self, obstacles, space):
         min_x, max_x, min_y, max_y = space
 
         #goal 과의 거리가 정해진 값보다 멀다면 랜덤 노드생성
+        # np.random.rand() -> 0~1 사이의 값 생성
         if np.random.rand() > self.config["goal_sample_rate"]:
             rand_x = np.random.uniform(min_x, max_x)
             rand_y = np.random.uniform(min_y, max_y)
@@ -67,12 +78,15 @@ class RRTStar(object):
         else:
             return self.goal
 
+    #가까운 노드 구함.
     def get_nearest(self, rand_node):
         # node: np.array with 2 elements
         min_dist = 1e10
         nearest_node_id = None
+
         for v in self.G.nodes:
             node = self.G.nodes[v]
+            #거리를 구하는 함수
             dist = np.hypot(rand_node[0] - node['x'], rand_node[1] - node['y'])
             if dist < min_dist:
                 nearest_node_id = v
@@ -80,9 +94,12 @@ class RRTStar(object):
 
         return nearest_node_id
 
+    # node와 노드를 연결하고
     def steer(self, node_from, node_to, u=None):
         dubins = Dubins()
-        curvature = 1.0/2.0
+        curvature = kappa # 1.0 / 2.0
+
+        #노드와 노드사이 길이 있는지 판별
         path, _, dubins_path = dubins.plan([node_from[0], node_from[1], node_from[2]],
                                            [node_to[0], node_to[1], node_to[2]], curvature)
         if path is None:
@@ -209,14 +226,13 @@ if __name__ == '__main__':
     objectList = scenario.getObject()
 
     #plot 공간
-    #사각형 공간으로 바꿔야함.
     # space = [min_x, max_x, min_y, max_y]
     space = [-18.19, 43.00, 1004.84, 1074.75]
     parking_Rectangle = Rectangle.Rectangle(p1,p2,p3,p4)
 
     #시작지점 설정
-    start_position = [-7.34284, 1062.8048]
-    start_yaw = degrees_to_radians(57.831) # 57.831
+    start_position = [5.5, 1068.8048]
+    start_yaw = degrees_to_radians(-35.765) # 57.831
     start = [start_position[0], start_position[1], start_yaw]
 
     #goal 포지션
@@ -239,7 +255,7 @@ if __name__ == '__main__':
         DataId = object['DataID']
         DataPos = object['pos']
         DataYaw = pify(degrees_to_radians(float(object['rot']['yaw'])))
-        
+
         DataX = DataPos['x']
         DataY = DataPos['y']
 
@@ -247,12 +263,12 @@ if __name__ == '__main__':
             obs = obstacle.RectangleObstacle(DataX,DataY,car_size[0],car_size[1],DataYaw)
             obstacles.append(obs)
         elif DataId == obstacleId['corn'] :
-            obs = obstacle.Obstacle(DataX,DataY,0.5)
+            obs = obstacle.Obstacle(DataX,DataY,0.75)
             obstacles.append(obs)
 
     # obstacles = []
 
-    #그리기
+    #장애물 그리기
     for obs in obstacles:
         obs.plot()
 
@@ -260,8 +276,8 @@ if __name__ == '__main__':
     config = {
         "eta": 10.0,
         #gamma = 최적화 범위
-        "gamma_rrt_star": 2.0,
-        "goal_sample_rate": 0.05,
+        "gamma_rrt_star": 2.0,  # 2.0
+        "goal_sample_rate": 0.1, # 0.05
     }
 
     rrt_star = RRTStar(start, goal, config)
@@ -270,20 +286,28 @@ if __name__ == '__main__':
     goal_node_id = None
 
     dubins = Dubins()
-    kappa = 1/2.0
+    # 1.0/2.0
 
     for i in range(500):
+        #make random node
+        #랜덤으로 goal 과 같은 노드가 생성됨.
         rand_node_state = rrt_star.sample_free(obstacles, space)
         # plt.plot(rand_node_state[0], rand_node_state[1], '.')
 
+        #while node is in parking lot
         while not parking_Rectangle.is_inside(rand_node_state) :
             rand_node_state = rrt_star.sample_free(obstacles, space)
 
-        plt.plot(rand_node_state[0], rand_node_state[1], '.')
+        #draw node
+        # plt.plot(rand_node_state[0], rand_node_state[1], '.')
 
+        #랜덤으로 생성된 노드와 가장 가까운 노드
         nearest_node_id = rrt_star.get_nearest(rand_node_state)
         nearest_node_state = rrt_star.get_node(nearest_node_id)
+
+        #
         new_node_state = rrt_star.steer(nearest_node_state, rand_node_state)
+
         if new_node_state is None:
             continue
         # plt.plot(new_node[0], new_node[1], 's')
