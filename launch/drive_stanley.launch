@@ -9,6 +9,7 @@
     <!-- <node pkg="parking" type="path_maker.py" name="parking" /> -->
 
     <!-- CONTROL_Stanley -->
+    <node pkg="control" type="lateral_controller.py" name="lateral_controller" output="screen" />
     <node pkg="motion_planner" type="rule_based_planner_stanley.py" name="rule_based_planner" output="screen"/>
 
     <!-- GPS AND IMU SENSOR -->
