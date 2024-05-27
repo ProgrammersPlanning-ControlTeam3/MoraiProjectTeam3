@@ -51,29 +51,48 @@ class latticePlanner:
             rate.sleep()
 
 
+    def transform_to_local(self, global_position, reference_position, reference_theta):
+        translation = np.array([global_position.x - reference_position.x,
+                                global_position.y - reference_position.y])
+        rotation_matrix = np.array([[cos(-reference_theta), -sin(-reference_theta)],
+                                    [sin(-reference_theta), cos(-reference_theta)]])
+        local_position = rotation_matrix.dot(translation)
+
+        return Point(x=local_position[0], y=local_position[1], z=0)
+
+
     def checkObject(self, ref_path, object_data, object_path):
         def is_collision_distance(path_pose, obj_position, threshold):
-            dis = sqrt(pow(path_pose.pose.position.x - obj_position.x, 2) + pow(path_pose.pose.position.y - obj_position.y, 2))
+            dis = sqrt(pow(path_pose.x - obj_position.x, 2) + pow(path_pose.y - obj_position.y, 2))
             return dis < threshold
 
         def is_path_overlap(path_pose, predicted_pose, threshold):
-            dis = sqrt(pow(path_pose.pose.position.x - predicted_pose.x, 2) + pow(path_pose.pose.position.y - predicted_pose.y, 2))
+            dis = sqrt(pow(path_pose.x - predicted_pose.x, 2) + pow(path_pose.y - predicted_pose.y, 2))
             return dis < threshold
 
+        vehicle_position = ref_path.poses[0].pose.position
+        theta = atan2(ref_path.poses[1].pose.position.y - vehicle_position.y,
+                      ref_path.poses[1].pose.position.x - vehicle_position.x)
+
+        local_path = [self.transform_to_local(pose.pose.position, vehicle_position, theta) for pose in ref_path.poses]
+
         # npc's position
-        for path in ref_path.poses:
+        for local_pose in local_path:
             for npc in object_data.npc_list:
-                if is_collision_distance(path, npc.position, 2.35):
+                local_npc_position = self.transform_to_local(npc.position, vehicle_position, theta)
+                if is_collision_distance(local_pose, local_npc_position, 2.35):
+                    print("NPC")
                     return True
 
         # npc's predicted path
         if object_path is not None:
-            for path in ref_path.poses:
+            for local_pose in local_path:
                 for predicted_path in object_path.path_list:
                     for predicted_pose in predicted_path.path:
-                        if is_path_overlap(path, predicted_pose, 2.35):  # 2.35는 임의의 임계값, 필요 시 조정
+                        local_predicted_position = self.transform_to_local(Point(x=predicted_pose.x, y=predicted_pose.y, z=0), vehicle_position, theta)
+                        if is_path_overlap(local_pose, local_predicted_position, 2.35):
+                            print("Path")
                             return True
-
         return False
 
 
@@ -175,7 +194,7 @@ class latticePlanner:
             local_end_point = det_trans_matrix.dot(world_end_point)
             world_ego_vehicle_position = np.array([[vehicle_pose_x], [vehicle_pose_y], [1]])
             local_ego_vehicle_position = det_trans_matrix.dot(world_ego_vehicle_position)
-            lane_off_set = [0, 4, 8]  # Only 3 offsets now
+            lane_off_set = [0, 2, 4]  # Only 3 offsets now
             local_lattice_points = []
 
             for i in range(len(lane_off_set)):
