@@ -12,10 +12,7 @@ from morai_msgs.msg import EgoVehicleStatus
 
 class pure_pursuit_no_npc:
     def __init__(self):
-
-
         # rospy.init_node('pure_pursuit', anonymous=True)
-
         rospy.Subscriber("/local_path", Path, self.path_callback)
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
@@ -117,10 +114,8 @@ class pure_pursuit:
         self.is_path = False
         self.is_odom = False
         self.is_status = False
-
         self.forward_point = Point()
         self.current_postion = Point()
-
         self.vehicle_length = 5.205  # Hyeondai Ioniq (hev)
         self.lfd = 10
         self.min_lfd = 10
@@ -207,11 +202,9 @@ class stanley :
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
         rospy.Subscriber("/local_path", Path, self.path_callback)
         # rospy.Subscriber("/lattice_path", Path, self.path_callback)
-
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/Ego_topic",EgoVehicleStatus, self.status_callback)
         # self.ctrl_cmd_pub = rospy.Publisher(name='ctrl_cmd_0',CtrlCmd, queue_size=1)
-
         # self.ctrl_cmd_msg = CtrlCmd()
         # self.ctrl_cmd_msg.longlCmdType = 1
 
@@ -219,21 +212,15 @@ class stanley :
         self.is_odom = False
         self.is_status = False
         self.is_global_path = False
-
         self.is_look_forward_point = True
-
         self.forward_point = Point()
         self.current_position = Point()
-
         self.vehicle_length = 5.205
-
         self.target_velocity = 40
-
 
     def path_callback(self,msg):
         self.is_path=True
-        self.path=msg  
-
+        self.path=msg
 
     def odom_callback(self,msg):
         self.is_odom=True
@@ -242,16 +229,16 @@ class stanley :
         self.current_position.x=msg.pose.pose.position.x
         self.current_position.y=msg.pose.pose.position.y
 
-    def status_callback(self,msg): ## Vehicl Status Subscriber 
+    def status_callback(self,msg): ## Vehicl Status Subscriber
         self.is_status=True
-        self.status_msg=msg    
-        
+        self.status_msg=msg
+
     def global_path_callback(self,msg):
         self.global_path = msg
         self.is_global_path = True
-    
+
     def get_current_waypoint(self,ego_status,global_path):
-        min_dist = float('inf')        
+        min_dist = float('inf')
         currnet_waypoint = -1
         for i,pose in enumerate(global_path.poses):
             dx = ego_status.position.x - pose.pose.position.x
@@ -262,7 +249,6 @@ class stanley :
                 min_dist = dist
                 currnet_waypoint = i
         return currnet_waypoint
-
 
     def calc_stanley_control(self):
             k = 1.0  # Stanley gain
