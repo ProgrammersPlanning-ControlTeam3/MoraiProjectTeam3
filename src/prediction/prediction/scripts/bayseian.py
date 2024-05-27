@@ -34,7 +34,7 @@ class VehicleTracker():
         self.action_matrix=np.array([0.8, 0.1,  0.1], # 1번째 state LK
                                     [0.6, 0.01, 0.39], # 2번째 state Right change
                                     [0.6, 0.39, 0.01]) # 3번째 state Left Change
-        self.lane_width=3.0
+        self.lane_width=3.5 # initial value
 
     ##########   CALLBACK Function   ########
     # Object Callback Function, Get the object info
@@ -46,10 +46,13 @@ class VehicleTracker():
 
     ########## Calculate b_ij probability using Gaussian Probability Distribution ########
     def calculate_probability(self, d_lat, v, lane_width):
+        #TODO(1): Calculating Observation Probability
+        ## Lane Change Profile Probability
+        self.p_lcv = lambda d_lat, v : multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(d_lat-self.lane_width/2)**2+self.v_max),0.4) if d_lat > 0 else multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(d_lat+self.lane_width/2)**2+self.v_max), 0.4)
+        self.p_lcv_minus = lambda d_lat, v : multivariate_normal.pdf(v, (2/self.lane_width)**2*self.v_max*(d_lat+self.lane_width/2)**2-self.v_max,0.4) if d_lat < 0 else  multivariate_normal.pdf(v, (2/self.lane_width)**2*self.v_max*(d_lat-self.lane_width/2)**2-self.v_max, 0.4)
 
-        self.p_lcv = lambda x, v : multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(x-self.lane_width/2)**2+self.v_max),0.4) if x > 0 else multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(x+self.lane_width/2)**2+self.v_max),0.4)
+        ## Lane Keeping Profile Probability
         self.p_lkv = lambda x, v: multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(x)**2),0.4) if x > 0 else multivariate_normal.pdf(v, ((2/self.w)**2*self.v_max*(x)**2),0.4)
-        self.p_lcv_minus = lambda x, v : multivariate_normal.pdf(v, (2/self.w)**2*self.v_max*(x+self.lane_width/2)**2-self.v_max,0.4) if x < 0 else  multivariate_normal.pdf(v, (2/self.w)**2*self.v_max*(x-self.lane_width/2)**2-self.v_max,0.4)
 
         mu_lc=-(2/lane_width)**2 * self.v_max*(d_lat-lane_width/2)**2+self.v_max
         mu_lk=-(2/lane_width)**2 * self.v_max*d_lat**2
@@ -68,6 +71,7 @@ class VehicleTracker():
         return p_lc_action, p_lk_action, p_lk, p_lc
 
     def frenet_frame(self, data):
+        #TODO(2) : Get frenet frame coordinate for every vehicles.
         d_lat={}
         s_long={}
         return s_long, d_lat
@@ -77,7 +81,7 @@ class VehicleTracker():
         for i in range(len(self.vehicles)):
             veh_data=np.array(self.vehicles[i][self.time-10:self.time+1])
 
-        #TODO(2) Prediction using Veh History Data (Markov Decision Problem)
+        #TODO(3) : Prediction using Veh History Data (Markov Decision Problem)
         # P(A|C,M)P(M|C)/SUM(P(A|C,M)) = P(M|A,C) # Select Maneuver
         pred="LC" if np.argmax(pred_lk, pred_lc, pred_rc)==1 else "LK"
 
