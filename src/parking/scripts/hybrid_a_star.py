@@ -5,6 +5,7 @@ import math
 import matplotlib.pyplot as plt
 import random
 import time
+from obstacle import Obstacle
 from map import map
 
 show_animation  = True
@@ -20,6 +21,7 @@ class Node:
         self.h = 0
 
 # Check if position of node is same( if distance < threshold, regard as same node)
+# 같은 위치인지 판별
 def isSamePosition(node_1, node_2, epsilon_position=0.8):
     SamePosition = False
     firstNodeX = node_1.position[0]
@@ -32,6 +34,7 @@ def isSamePosition(node_1, node_2, epsilon_position=0.8):
         SamePosition = False
     return SamePosition # True or False
 
+# 같은 각도인지 판별
 def isSameYaw(node_1, node_2, epsilon_yaw=0.2):
     SameYaw = False
     firstNodeYaw = node_1.position[2]
@@ -43,6 +46,7 @@ def isSameYaw(node_1, node_2, epsilon_yaw=0.2):
     return SameYaw# True or False
 
 # Action set, Moving only forward direction
+# 가능한 움직임 리스트
 def get_action(R, Vx, delta_time_step):
     yaw_rate = Vx / R
     distance_travel = Vx * delta_time_step
@@ -53,6 +57,12 @@ def get_action(R, Vx, delta_time_step):
                   [yaw_rate/2, delta_time_step, distance_travel],
                   [-yaw_rate/2, delta_time_step, distance_travel],
                   [0.0, delta_time_step, distance_travel]]
+    # action_set = [[yaw_rate, delta_time_step, distance_travel],
+    #               [-yaw_rate, delta_time_step, distance_travel],
+    #               [0.0, delta_time_step, distance_travel]]
+    
+    
+    
     return action_set
 
 # Vehicle movement
@@ -81,6 +91,7 @@ def vehicle_move(position_parent, yaw_rate, delta_time, Vx):
     # return position : [x, y, yaw]
     return [x_child, y_child, yaw_child]
 
+# 원과 직선의 거리를 구하는 함수
 def distanceBetweenLindAndCircle(line_slope, line_intercept,circle_center):
     ob_x, ob_y = circle_center
 
@@ -89,33 +100,40 @@ def distanceBetweenLindAndCircle(line_slope, line_intercept,circle_center):
 
     return vertical_distance
 
+# 점과 점을 잇는 1차함수 구하기
 def calculate_line_equation(point1, point2):
     x1, y1 = point1[:2]
     x2, y2 = point2[:2]
 
+    #m = 기울기
     m = (y2 - y1) / (x2 - x1) if x2 != x1 else float('inf')
+    #b = 절편
     b = y1 - m * x1 if m != float('inf') else x1  # y = mx + b
 
     return m, b
 
 # Collision check : path overlaps with any of obstacle
 def collision_check(position_parent, yaw_rate, delta_time_step, obstacle_list, Vx):
+    # 이전 노드를 기반으로 움직임 계산
     position_child = vehicle_move(position_parent,yaw_rate,delta_time_step,Vx)
+
     px = position_parent[0]
     py = position_parent[1]
     cx = position_child[0]
     cy = position_child[1]
+
+    # 부모 노드와 아들노드 사이를 잇는 직선
     m ,b = calculate_line_equation(position_parent,position_child)
     grad = (cy-py) / (cx-px)
+
     col = False
     for obstacle in obstacle_list:
-        obs_x , obs_y, obs_r = obstacle
-        distance = distanceBetweenLindAndCircle(m,b,(obs_x,obs_y))
-        if distance < obs_r :
+        # obs_x , obs_y, obs_r = obstacle
+        # distance = distanceBetweenLindAndCircle(m,b,(obs_x,obs_y))
+        # obstacle.is_inside(cx,cy)
+        if obstacle.is_inside(cx,cy) :
             col = True
-        # if ((obs_x - obs_r <= cx and cx <= obs_x + obs_r ) and (obs_y - obs_r <= cy and cy <= obs_y + obs_r)):
-        #     col = True
-        #     break
+            return True
 
     return col
 
@@ -148,6 +166,7 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
         # Find node with lowest cost
         cur_node = open_list[0]
         cur_index = 0
+
         # print("######searching##########")
         for index, node in enumerate(open_list):
             # print(node.position, node.f)
@@ -239,6 +258,7 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
 
 def main():
 
+    #map()에 정보가 다 있음.
     start, goal, obstacle_list, space = map()
 
     if show_animation == True:
@@ -248,18 +268,22 @@ def main():
         plt.text(start[0], start[1]+0.5, 'start', fontsize=12)
         plt.plot(goal[0], goal[1], 'rs',  markersize=7)
         plt.text(goal[0], goal[1]+0.5, 'goal', fontsize=12)
-        for i in range(len(obstacle_list)):
-            x_obstacle = obstacle_list[i][0] + obstacle_list[i][2] * np.cos(theta_plot)
-            y_obstacle = obstacle_list[i][1] + obstacle_list[i][2] * np.sin(theta_plot)
-            plt.plot(x_obstacle, y_obstacle,'k-')
+
+        for obs in obstacle_list :
+            obs.plot()
+
         plt.axis(space)
         plt.grid(True)
         plt.xlabel("X [m]"), plt.ylabel("Y [m]")
         plt.title("Hybrid a star algorithm", fontsize=20)
 
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.0, Vx=2.0, delta_time_step=0.5, weight=0.0)
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
+
     print("Optimal path found!")
     opt_path = np.array(opt_path)
+    # print(opt_path)
+    
+    #optimal path
     if show_animation == True:
         plt.plot(opt_path[:,0], opt_path[:,1], "m.-")
         plt.show()
