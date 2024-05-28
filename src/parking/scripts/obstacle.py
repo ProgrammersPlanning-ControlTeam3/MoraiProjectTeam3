@@ -2,11 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class Obstacle(object):
-    def __init__(self, x, y, r,w):
+    def __init__(self, x, y, r, w):
         self.x = x
         self.y = y
-        self.r = r
+        # self.r = r
         self.w = w
+        self.r = w * r
 
     def plot(self, color='k'):
         theta = np.linspace(0, np.pi*2, num=30)
@@ -21,6 +22,8 @@ class Obstacle(object):
             return True
         else:
             return False
+    def get_center(self):
+        return [(self.x,self.y)]
 
 class RectangleObstacle(object):
     def __init__(self, center_x, center_y, width, height, angle,collision_weight):
@@ -59,6 +62,7 @@ class RectangleObstacle(object):
         else:
             return False
 
+
     def make_circle(self):
         gap_x = 0.75 * self.height * np.cos(self.angle)
         gap_y = 0.75 * self.height * np.sin(self.angle)
@@ -68,6 +72,9 @@ class RectangleObstacle(object):
 
         self.p2_x = self.x - gap_x
         self.p2_y = self.y - gap_y
+
+    def get_center(self):
+        return [(self.p1_x,self.p1_y),(self.p2_x,self.p2_y)]
 
     def plot(self, color='g'):
         # 회전된 사각형의 꼭지점을 계산

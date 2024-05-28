@@ -27,7 +27,6 @@ class Node:
         self.h = 0
 
 # Check if position of node is same( if distance < threshold, regard as same node)
-# 같은 위치인지 판별
 def isSamePosition(node_1, node_2, epsilon_position=0.8):
     SamePosition = False
     firstNodeX = node_1.position[0]
@@ -40,7 +39,6 @@ def isSamePosition(node_1, node_2, epsilon_position=0.8):
         SamePosition = False
     return SamePosition # True or False
 
-# 같은 각도인지 판별
 def isSameYaw(node_1, node_2, epsilon_yaw=0.2):
     SameYaw = False
     firstNodeYaw = node_1.position[2]
@@ -52,7 +50,6 @@ def isSameYaw(node_1, node_2, epsilon_yaw=0.2):
     return SameYaw# True or False
 
 # Action set, Moving only forward direction
-# 가능한 움직임 리스트
 def get_action(R, Vx, delta_time_step):
     yaw_rate = Vx / R
     distance_travel = Vx * delta_time_step
@@ -63,7 +60,6 @@ def get_action(R, Vx, delta_time_step):
                   [yaw_rate/2, delta_time_step, distance_travel],
                   [-yaw_rate/2, delta_time_step, distance_travel],
                   [0.0, delta_time_step, distance_travel]]
-    
     return action_set
 
 # Vehicle movement
@@ -132,7 +128,13 @@ def collision_check(position_parent, yaw_rate, delta_time_step, obstacle_list, V
         # obs_x , obs_y, obs_r = obstacle
         # distance = distanceBetweenLindAndCircle(m,b,(obs_x,obs_y))
         # obstacle.is_inside(cx,cy)
-        if obstacle.is_inside(cx,cy) :
+        dist_list = []
+        for center in obstacle.get_center():
+            dist = distanceBetweenLindAndCircle(m,b,(center[0],center[1]))
+            dist_list.append(dist)
+        min_dist = min(dist_list)
+
+        if obstacle.is_inside(cx,cy) or (min_dist <= obstacle.r) :
             col = True
             return True
 
