@@ -25,7 +25,6 @@ class latticePlanner:
         rospy.Subscriber('/Object_topic/tracked_object_path_topic', PredictedObjectPathList, self.object_path_callback)
         rospy.Subscriber('/Object_topic/deleted_object_id', Int32, self.deleted_object_callback)
 
-
         self.lattice_path_pub = rospy.Publisher('/lattice_path', Path, queue_size=1)
 
         self.is_path = False
@@ -50,16 +49,13 @@ class latticePlanner:
                     self.lattice_path_pub.publish(self.local_path)
             rate.sleep()
 
-
     def transform_to_local(self, global_position, reference_position, reference_theta):
         translation = np.array([global_position.x - reference_position.x,
                                 global_position.y - reference_position.y])
         rotation_matrix = np.array([[cos(-reference_theta), -sin(-reference_theta)],
                                     [sin(-reference_theta), cos(-reference_theta)]])
         local_position = rotation_matrix.dot(translation)
-
         return Point(x=local_position[0], y=local_position[1], z=0)
-
 
     def checkObject(self, ref_path, object_data, object_path):
         def is_collision_distance(path_pose, obj_position, threshold):
@@ -95,12 +91,10 @@ class latticePlanner:
                             return True
         return False
 
-
     def collision_check(self, object_data, out_path):
         # TODO: (6) 생성된 충돌회피 경로 중 낮은 비용의 경로 선택
-
         selected_lane = -1
-        lane_weight = [1, 10, 100]  # reference path
+        lane_weight = [1, 1, 1, 1, 1, 1]  # 각 경로에 대한 가중치 초기화
 
         for obstacle in object_data.npc_list:
             for path_num in range(len(out_path)):
@@ -128,7 +122,7 @@ class latticePlanner:
         self.is_path = True
         self.local_path = msg
 
-    def status_callback(self, msg):  ## Vehicl Status Subscriber
+    def status_callback(self, msg):  ## Vehicle Status Subscriber
         self.is_status = True
         self.status_msg = msg
 
@@ -137,16 +131,28 @@ class latticePlanner:
         self.object_data = msg
 
     def object_info_callback(self, msg):
-        self.is_pose_received=True
+        self.is_pose_received = True
         self.object_pose = msg
 
     def object_path_callback(self, msg):
-        self.is_path_received=True
+        self.is_path_received = True
         self.object_path = msg
 
     def deleted_object_callback(self, msg):
         self.deleted_ids.add(msg.data)
 
+    def generate_5th_order_polynomial(self, ys, yf, xs, xf):
+        # 5차 곡선 계수 계산
+        a0 = ys
+        a1 = 0
+        a2 = 0
+        a3 = (10 * (yf - ys)) / (xf ** 3)
+        a4 = (-15 * (yf - ys)) / (xf ** 4)
+        a5 = (6 * (yf - ys)) / (xf ** 5)
+        return [a0, a1, a2, a3, a4, a5]
+
+    def calculate_polynomial(self, a, x_vals):
+        return a[0] + a[1] * x_vals + a[2] * x_vals**2 + a[3] * x_vals**3 + a[4] * x_vals**4 + a[5] * x_vals**5
 
     def latticePlanner(self, ref_path, vehicle_status):
         out_path = []
@@ -174,50 +180,52 @@ class latticePlanner:
             global_ref_end_point = (ref_path.poses[look_distance * 2].pose.position.x,
                                     ref_path.poses[look_distance * 2].pose.position.y)
 
+            # 차량의 현재 위치를 프레네 좌표계로 변환
             vehicle_s, vehicle_d = get_frenet(vehicle_pose_x, vehicle_pose_y, mapx, mapy)
 
+            # 목표 지점을 프레네 좌표계로 변환
             goal_s, goal_d = get_frenet(global_ref_end_point[0], global_ref_end_point[1], mapx, mapy)
             lane_offsets = [0, 3, 5]
+            time_offsets = [0.7, 1.1]  # 두 개의 시간 후보 생성
 
-            for offset in lane_offsets:
-                lattice_path = Path()
-                lattice_path.header.frame_id = 'map'
-                goal_d_with_offset = vehicle_d + offset  
+            for time_offset in time_offsets:
+                for lane_offset in lane_offsets:
+                    lattice_path = Path()
+                    lattice_path.header.frame_id = 'map'
+                    goal_d_with_offset = vehicle_d + lane_offset  # 현재 d에서 오프셋 추가
 
-                # 5차 곡선 생성
-                xs = 0
-                xf = goal_s - vehicle_s
-                ys = vehicle_d
-                yf = goal_d_with_offset
+                    #ToDo Need to change to forward vehicle's speed (?)
+                    # goal_s_with_offset = vehicle_s + vehicle_velocity * time_offset  # 시간에 따른 종 방향 목표 지점 계산
+                    goal_s_with_offset = vehicle_s + 30 * time_offset
 
-                a0 = ys
-                a1 = 0
-                a2 = 0
-                a3 = (10*(yf - ys)) / (xf**3)
-                a4 = (-15*(yf - ys)) / (xf**4)
-                a5 = (6*(yf - ys)) / (xf**5)
+                    # 5차 곡선 생성
+                    xs = 0
+                    xf = goal_s_with_offset - vehicle_s
+                    ys = vehicle_d
+                    yf = goal_d_with_offset
 
-                x_vals = np.linspace(xs, xf, num=100)
-                y_vals = a0 + a1 * x_vals + a2 * x_vals**2 + a3 * x_vals**3 + a4 * x_vals**4 + a5 * x_vals**5
+                    a = self.generate_5th_order_polynomial(ys, yf, xs, xf)
+                    x_vals = np.linspace(xs, xf, num=100)
+                    y_vals = self.calculate_polynomial(a, x_vals)
 
-                for i in range(len(x_vals)):
-                    x = x_vals[i] + vehicle_s
-                    y = y_vals[i]
+                    for i in range(len(x_vals)):
+                        x = x_vals[i] + vehicle_s
+                        y = y_vals[i]
 
-                    # Frenet to Cartesian
-                    global_x, global_y, _ = get_cartesian(x, y, mapx, mapy, maps)
-                    
-                    read_pose = PoseStamped()
-                    read_pose.pose.position.x = global_x
-                    read_pose.pose.position.y = global_y
-                    read_pose.pose.position.z = 0
-                    read_pose.pose.orientation.x = 0
-                    read_pose.pose.orientation.y = 0
-                    read_pose.pose.orientation.z = 0
-                    read_pose.pose.orientation.w = 1
-                    lattice_path.poses.append(read_pose)
+                        # 프레네 좌표를 다시 전역 좌표계로 변환
+                        global_x, global_y, _ = get_cartesian(x, y, mapx, mapy, maps)
+                        
+                        read_pose = PoseStamped()
+                        read_pose.pose.position.x = global_x
+                        read_pose.pose.position.y = global_y
+                        read_pose.pose.position.z = 0
+                        read_pose.pose.orientation.x = 0
+                        read_pose.pose.orientation.y = 0
+                        read_pose.pose.orientation.z = 0
+                        read_pose.pose.orientation.w = 1
+                        lattice_path.poses.append(read_pose)
 
-                out_path.append(lattice_path)
+                    out_path.append(lattice_path)
 
             # Add_point
             add_point_size = min(int(vehicle_velocity * 2), len(ref_path.poses))
@@ -251,7 +259,6 @@ class latticePlanner:
                 globals()['lattice_pub_{}'.format(i + 1)].publish(out_path[i])
 
         return out_path
-
 
 
 if __name__ == '__main__':
