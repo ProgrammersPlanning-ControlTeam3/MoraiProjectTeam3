@@ -47,8 +47,9 @@ def map():
             obs = obstacle.RectangleObstacle(DataX,DataY,car_size[0],car_size[1],DataYaw)
             obstacleList.append(obs)
         elif DataId == obstacleId['corn'] :
-            obs = obstacle.Obstacle(DataX,DataY,0.6)
+            obs = obstacle.Obstacle(DataX,DataY,1.2)
             obstacleList.append(obs)
+    # obstacleList = []
 
     return start, goal, obstacleList, space
 
@@ -58,7 +59,7 @@ if __name__ == "__main__":
     plt.figure(figsize=(8,8))
     plt.plot(start[0], start[1], 'bs',  markersize=7)
     plt.text(start[0], start[1]+0.5, 'start', fontsize=12)
-    
+
     plt.plot(goal[0], goal[1], 'rs',  markersize=7)
     plt.text(goal[0], goal[1]+0.5, 'goal', fontsize=12)
     for obs in obstacle_list :
