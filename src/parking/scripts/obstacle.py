@@ -2,10 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class Obstacle(object):
-    def __init__(self, x, y, r):
+    def __init__(self, x, y, r,w):
         self.x = x
         self.y = y
         self.r = r
+        self.w = w
 
     def plot(self, color='k'):
         theta = np.linspace(0, np.pi*2, num=30)
@@ -16,7 +17,7 @@ class Obstacle(object):
 
     def is_inside(self, x, y):
         dist = np.hypot(x - self.x, y - self.y)
-        if dist <= self.r:
+        if dist <= self.r * self.w:
             return True
         else:
             return False
@@ -30,23 +31,33 @@ class RectangleObstacle(object):
         self.height = height
         self.angle = angle
         self.collision_weight = collision_weight
+        self.r = collision_weight * self.height
         self.make_circle()
 
+    # def is_inside(self, x, y):
+    #     # 좌표를 회전된 좌표계로 변환
+    #     cos_val = np.cos(-self.angle)
+    #     sin_val = np.sin(-self.angle)
+    #     rotated_x = (x - self.x) * cos_val - (y - self.y) * sin_val
+    #     rotated_y = (x - self.x) * sin_val + (y - self.y) * cos_val
+
+    #     # 회전된 좌표로 충돌 검사
+    #     half_width = 1. * self.width # 0.7
+    #     half_height = 1. * self.height
+
+    #     if -half_width <= rotated_x <= half_width \
+    #         and -half_height <= rotated_y <= half_height:
+    #         return True
+    #     return False
+
     def is_inside(self, x, y):
-        # 좌표를 회전된 좌표계로 변환
-        cos_val = np.cos(-self.angle)
-        sin_val = np.sin(-self.angle)
-        rotated_x = (x - self.x) * cos_val - (y - self.y) * sin_val
-        rotated_y = (x - self.x) * sin_val + (y - self.y) * cos_val
-
-        # 회전된 좌표로 충돌 검사
-        half_width = 1. * self.width # 0.7
-        half_height = 1. * self.height
-
-        if -half_width <= rotated_x <= half_width \
-            and -half_height <= rotated_y <= half_height:
+        dist_p1 = np.hypot(x - self.p1_x, y - self.p1_y)
+        dist_p2 = np.hypot(x - self.p2_x, y - self.p2_y)
+    
+        if dist_p1 <= self.r or dist_p2 <= self.r :
             return True
-        return False
+        else:
+            return False
 
     def make_circle(self):
         gap_x = 0.75 * self.height * np.cos(self.angle)
@@ -105,12 +116,11 @@ class RectangleObstacle(object):
         #p1, p2 그리기
         theta = np.linspace(0, np.pi*2, num=30)
         
-        x = self.p1_x + self.height * np.cos(theta) * self.collision_weight
-        y = self.p1_y + self.height * np.sin(theta) * self.collision_weight
+        p1_x = self.p1_x + self.height * np.cos(theta) * self.collision_weight
+        p1_y = self.p1_y + self.height * np.sin(theta) * self.collision_weight
 
-        plt.plot(x, y, color=color)
+        p2_x = self.p2_x + self.height * np.cos(theta) * self.collision_weight
+        p2_y = self.p2_y + self.height * np.sin(theta) * self.collision_weight
 
-        x = self.p2_x + self.height * np.cos(theta) * self.collision_weight
-        y = self.p2_y + self.height * np.sin(theta) * self.collision_weight
-
-        plt.plot(x, y, color=color)
+        plt.plot(p1_x, p1_y,'g--' ,color='y')
+        plt.plot(p2_x, p2_y,'g--' ,color='y')
