@@ -94,7 +94,7 @@ class latticePlanner:
     def collision_check(self, object_data, out_path):
         # TODO: (6) 생성된 충돌회피 경로 중 낮은 비용의 경로 선택
         selected_lane = -1
-        lane_weight = [1, 1, 1, 1, 1, 1] 
+        lane_weight = [10, 40, 150, 1, 30, 100]
 
         for obstacle in object_data.npc_list:
             for path_num in range(len(out_path)):
@@ -183,7 +183,7 @@ class latticePlanner:
             vehicle_s, vehicle_d = get_frenet(vehicle_pose_x, vehicle_pose_y, mapx, mapy)
 
             goal_s, goal_d = get_frenet(global_ref_end_point[0], global_ref_end_point[1], mapx, mapy)
-            lane_offsets = [0, 3, 5]
+            lane_offsets = [3, 4, 5]
             time_offsets = [0.6, 1.0]
 
             for time_offset in time_offsets:
