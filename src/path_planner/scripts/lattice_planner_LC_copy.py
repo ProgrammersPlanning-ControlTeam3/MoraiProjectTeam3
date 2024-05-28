@@ -11,7 +11,7 @@ from nav_msgs.msg import Path
 from std_msgs.msg import Int32
 
 import numpy as np
-from frame_transform import *
+
 
 class latticePlanner:
     def __init__(self):
@@ -147,7 +147,6 @@ class latticePlanner:
     def deleted_object_callback(self, msg):
         self.deleted_ids.add(msg.data)
 
-
     def latticePlanner(self, ref_path, vehicle_status):
         out_path = []
         vehicle_pose_x = vehicle_status.position.x
@@ -164,52 +163,85 @@ class latticePlanner:
         look_distance = min(look_distance, max_look_distance)
 
         if len(ref_path.poses) > look_distance:
-            # 지도 데이터
-            mapx = [pose.pose.position.x for pose in ref_path.poses]
-            mapy = [pose.pose.position.y for pose in ref_path.poses]
-            maps = [0]
-            for i in range(1, len(mapx)):
-                maps.append(maps[-1] + get_dist(mapx[i-1], mapy[i-1], mapx[i], mapy[i]))
+            # TODO: (3) 좌표 변환 행렬 생성
+            """
+            # 좌표 변환 행렬을 만듭니다.
+            # Lattice 경로를 만들기 위해서 경로 생성을 시작하는 Point 좌표에서 
+            # 경로 생성이 끝나는 Point 좌표의 상대 위치를 계산해야 합니다.
+            """
+
+            global_ref_start_point = (ref_path.poses[0].pose.position.x, ref_path.poses[0].pose.position.y)
+            global_ref_start_next_point = (ref_path.poses[1].pose.position.x, ref_path.poses[1].pose.position.y)
 
             global_ref_end_point = (ref_path.poses[look_distance * 2].pose.position.x,
                                     ref_path.poses[look_distance * 2].pose.position.y)
 
-            vehicle_s, vehicle_d = get_frenet(vehicle_pose_x, vehicle_pose_y, mapx, mapy)
+            theta = atan2(global_ref_start_next_point[1] - global_ref_start_point[1],
+                          global_ref_start_next_point[0] - global_ref_start_point[0])
+            translation = [global_ref_start_point[0], global_ref_start_point[1]]
 
-            goal_s, goal_d = get_frenet(global_ref_end_point[0], global_ref_end_point[1], mapx, mapy)
-            lane_offsets = [0, 3, 5]
+            trans_matrix = np.array([[cos(theta), -sin(theta), translation[0]],
+                                     [sin(theta), cos(theta), translation[1]],
+                                     [0, 0, 1]])
 
-            for offset in lane_offsets:
+            det_trans_matrix = np.array([[trans_matrix[0][0], trans_matrix[1][0],
+                                          -(trans_matrix[0][0] * translation[0] + trans_matrix[1][0] * translation[1])],
+                                         [trans_matrix[0][1], trans_matrix[1][1],
+                                          -(trans_matrix[0][1] * translation[0] + trans_matrix[1][1] * translation[1])],
+                                         [0, 0, 1]])
+
+            world_end_point = np.array([[global_ref_end_point[0]], [global_ref_end_point[1]], [1]])
+            local_end_point = det_trans_matrix.dot(world_end_point)
+            world_ego_vehicle_position = np.array([[vehicle_pose_x], [vehicle_pose_y], [1]])
+            local_ego_vehicle_position = det_trans_matrix.dot(world_ego_vehicle_position)
+            lane_off_set = [0, 2, 4]  # Only 3 offsets now
+            local_lattice_points = []
+
+            for i in range(len(lane_off_set)):
+                local_lattice_points.append([local_end_point[0][0], local_end_point[1][0] + lane_off_set[i], 1])
+
+            # TODO: (4) Lattice 충돌 회피 경로 생성
+            '''
+            # Local 좌표계로 변경 후 3차곡선계획법에 의해 경로를 생성한 후 다시 Map 좌표계로 가져옵니다.
+            # Path 생성 방식은 3차 방정식을 이용하며 lane_change_ 예제와 동일한 방식의 경로 생성을 하면 됩니다.
+            # 생성된 Lattice 경로는 out_path 변수에 List 형식으로 넣습니다.
+            # 충돌 회피 경로는 기존 경로를 제외하고 좌 우로 1개씩 총 2개의 경로를 가지도록 합니다.
+            '''
+
+            for end_point in local_lattice_points:
                 lattice_path = Path()
                 lattice_path.header.frame_id = 'map'
-                goal_d_with_offset = vehicle_d + offset  
-
-                # 5차 곡선 생성
+                x = []
+                y = []
+                x_interval = 0.5
                 xs = 0
-                xf = goal_s - vehicle_s
-                ys = vehicle_d
-                yf = goal_d_with_offset
+                xf = end_point[0]
+                ps = local_ego_vehicle_position[1][0]
 
-                a0 = ys
-                a1 = 0
-                a2 = 0
-                a3 = (10*(yf - ys)) / (xf**3)
-                a4 = (-15*(yf - ys)) / (xf**4)
-                a5 = (6*(yf - ys)) / (xf**5)
+                pf = end_point[1]
+                x_num = xf / x_interval
 
-                x_vals = np.linspace(xs, xf, num=100)
-                y_vals = a0 + a1 * x_vals + a2 * x_vals**2 + a3 * x_vals**3 + a4 * x_vals**4 + a5 * x_vals**5
+                for i in range(xs, int(x_num)):
+                    x.append(i * x_interval)
 
-                for i in range(len(x_vals)):
-                    x = x_vals[i] + vehicle_s
-                    y = y_vals[i]
+                a = [0.0, 0.0, 0.0, 0.0]
+                a[0] = ps
+                a[1] = 0
+                a[2] = 3.0 * (pf - ps) / (xf * xf)
+                a[3] = -2.0 * (pf - ps) / (xf * xf * xf)
 
-                    # Frenet to Cartesian
-                    global_x, global_y, _ = get_cartesian(x, y, mapx, mapy, maps)
-                    
+                # 3차 곡선 계획
+                for i in x:
+                    result = a[3] * i * i * i + a[2] * i * i + a[1] * i + a[0]
+                    y.append(result)
+
+                for i in range(0, len(y)):
+                    local_result = np.array([[x[i]], [y[i]], [1]])
+                    global_result = trans_matrix.dot(local_result)
+
                     read_pose = PoseStamped()
-                    read_pose.pose.position.x = global_x
-                    read_pose.pose.position.y = global_y
+                    read_pose.pose.position.x = global_result[0][0]
+                    read_pose.pose.position.y = global_result[1][0]
                     read_pose.pose.position.z = 0
                     read_pose.pose.orientation.x = 0
                     read_pose.pose.orientation.y = 0
@@ -231,8 +263,8 @@ class latticePlanner:
                     tmp_t = np.array(
                         [[cos(tmp_theta), -sin(tmp_theta), tmp_translation[0]], [sin(tmp_theta), cos(tmp_theta), tmp_translation[1]], [0, 0, 1]])
 
-                    for lane_num in range(len(lane_offsets)):
-                        local_result = np.array([[0], [lane_offsets[lane_num]], [1]])
+                    for lane_num in range(len(lane_off_set)):
+                        local_result = np.array([[0], [lane_off_set[lane_num]], [1]])
                         global_result = tmp_t.dot(local_result)
 
                         read_pose = PoseStamped()
@@ -245,13 +277,16 @@ class latticePlanner:
                         read_pose.pose.orientation.w = 1
                         out_path[lane_num].poses.append(read_pose)
 
-            # 생성된 모든 Lattice 충돌 회피 경로 메시지 Publish
+            # TODO: (5) 생성된 모든 Lattice 충돌 회피 경로 메시지 Publish
+            '''
+            # 생성된 모든 Lattice 충돌회피 경로는 ros 메세지로 송신하여
+            # Rviz 창에서 시각화 하도록 합니다.
+            '''
             for i in range(len(out_path)):
                 globals()['lattice_pub_{}'.format(i + 1)] = rospy.Publisher('/lattice_path_{}'.format(i + 1), Path, queue_size=1)
                 globals()['lattice_pub_{}'.format(i + 1)].publish(out_path[i])
 
         return out_path
-
 
 
 if __name__ == '__main__':
