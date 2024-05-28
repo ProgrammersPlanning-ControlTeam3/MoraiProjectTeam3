@@ -18,7 +18,7 @@ import rectangle as Rectangle
 3. obstacle 불러오기 (완)
 4.
 
-###################차량 스펙########
+###################차량 스펙##################
 max wheel Angle : -35~ 35
 Length : 5.205m
 Width : 1.495m
@@ -126,7 +126,7 @@ class RRTStar(object):
         return node_state
 
     def is_collision_free(self, node_from, node_to, obstacles):
-        curvature = 1.0/2.0
+        curvature = kappa
         path, _, dubins_path = dubins.plan([node_from[0], node_from[1], node_from[2]],
                                            [node_to[0], node_to[1], node_to[2]], curvature)
 
