@@ -94,7 +94,7 @@ class latticePlanner:
     def collision_check(self, object_data, out_path):
         # TODO: (6) 생성된 충돌회피 경로 중 낮은 비용의 경로 선택
         selected_lane = -1
-        lane_weight = [1, 1, 1, 1, 1, 1]  # 각 경로에 대한 가중치 초기화
+        lane_weight = [1, 1, 1, 1, 1, 1] 
 
         for obstacle in object_data.npc_list:
             for path_num in range(len(out_path)):
@@ -180,25 +180,23 @@ class latticePlanner:
             global_ref_end_point = (ref_path.poses[look_distance * 2].pose.position.x,
                                     ref_path.poses[look_distance * 2].pose.position.y)
 
-            # 차량의 현재 위치를 프레네 좌표계로 변환
             vehicle_s, vehicle_d = get_frenet(vehicle_pose_x, vehicle_pose_y, mapx, mapy)
 
-            # 목표 지점을 프레네 좌표계로 변환
             goal_s, goal_d = get_frenet(global_ref_end_point[0], global_ref_end_point[1], mapx, mapy)
             lane_offsets = [0, 3, 5]
-            time_offsets = [0.7, 1.1]  # 두 개의 시간 후보 생성
+            time_offsets = [0.6, 1.0]
 
             for time_offset in time_offsets:
                 for lane_offset in lane_offsets:
                     lattice_path = Path()
                     lattice_path.header.frame_id = 'map'
-                    goal_d_with_offset = vehicle_d + lane_offset  # 현재 d에서 오프셋 추가
+                    goal_d_with_offset = vehicle_d + lane_offset 
 
                     #ToDo Need to change to forward vehicle's speed (?)
-                    # goal_s_with_offset = vehicle_s + vehicle_velocity * time_offset  # 시간에 따른 종 방향 목표 지점 계산
+                    # goal_s_with_offset = vehicle_s + vehicle_velocity * time_offset
                     goal_s_with_offset = vehicle_s + 30 * time_offset
 
-                    # 5차 곡선 생성
+                    # 5차 곡선
                     xs = 0
                     xf = goal_s_with_offset - vehicle_s
                     ys = vehicle_d
@@ -212,7 +210,6 @@ class latticePlanner:
                         x = x_vals[i] + vehicle_s
                         y = y_vals[i]
 
-                        # 프레네 좌표를 다시 전역 좌표계로 변환
                         global_x, global_y, _ = get_cartesian(x, y, mapx, mapy, maps)
                         
                         read_pose = PoseStamped()
