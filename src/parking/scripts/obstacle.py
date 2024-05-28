@@ -22,13 +22,15 @@ class Obstacle(object):
             return False
 
 class RectangleObstacle(object):
-    def __init__(self, center_x, center_y, width, height, angle):
+    def __init__(self, center_x, center_y, width, height, angle,collision_weight):
         self.gap = 1.25
-        self.x = center_x + np.cos(angle)* self.gap
-        self.y = center_y + np.sin(angle)* self.gap
+        self.x = center_x + np.cos(angle) * self.gap
+        self.y = center_y + np.sin(angle) * self.gap
         self.width = width
         self.height = height
         self.angle = angle
+        self.collision_weight = collision_weight
+        self.make_circle()
 
     def is_inside(self, x, y):
         # 좌표를 회전된 좌표계로 변환
@@ -38,11 +40,23 @@ class RectangleObstacle(object):
         rotated_y = (x - self.x) * sin_val + (y - self.y) * cos_val
 
         # 회전된 좌표로 충돌 검사
-        half_width = 1.3 * self.width # 0.7
-        half_height = 1.3 * self.height
-        if -half_width <= rotated_x <= half_width and -half_height <= rotated_y <= half_height:
+        half_width = 1. * self.width # 0.7
+        half_height = 1. * self.height
+
+        if -half_width <= rotated_x <= half_width \
+            and -half_height <= rotated_y <= half_height:
             return True
         return False
+
+    def make_circle(self):
+        gap_x = 0.75 * self.height * np.cos(self.angle)
+        gap_y = 0.75 * self.height * np.sin(self.angle)
+
+        self.p1_x = self.x + gap_x
+        self.p1_y = self.y + gap_y
+
+        self.p2_x = self.x - gap_x
+        self.p2_y = self.y - gap_y
 
     def plot(self, color='g'):
         # 회전된 사각형의 꼭지점을 계산
@@ -87,3 +101,16 @@ class RectangleObstacle(object):
         # 회전된 직사각형 그리기
         plt.plot([x1_rotated, x2_rotated, x3_rotated, x4_rotated, x1_rotated],
                  [y1_rotated, y2_rotated, y3_rotated, y4_rotated, y1_rotated], color)
+
+        #p1, p2 그리기
+        theta = np.linspace(0, np.pi*2, num=30)
+        
+        x = self.p1_x + self.height * np.cos(theta) * self.collision_weight
+        y = self.p1_y + self.height * np.sin(theta) * self.collision_weight
+
+        plt.plot(x, y, color=color)
+
+        x = self.p2_x + self.height * np.cos(theta) * self.collision_weight
+        y = self.p2_y + self.height * np.sin(theta) * self.collision_weight
+
+        plt.plot(x, y, color=color)
