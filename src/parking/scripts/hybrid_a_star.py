@@ -9,7 +9,13 @@ from obstacle import Obstacle
 from map import map
 
 show_animation  = True
-
+"""
+###################차량 스펙##################
+max wheel Angle : -35~ 35
+Length : 5.205m
+Width : 1.495m
+Wheelbase : 3.16 m
+"""
 class Node:
     def __init__(self, parent=None, position=None):
         self.parent = parent
@@ -271,7 +277,7 @@ def main():
         plt.xlabel("X [m]"), plt.ylabel("Y [m]")
         plt.title("Hybrid a star algorithm", fontsize=20)
 
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.05)
 
     print("Optimal path found!")
     opt_path = np.array(opt_path)
