@@ -57,11 +57,6 @@ def get_action(R, Vx, delta_time_step):
                   [yaw_rate/2, delta_time_step, distance_travel],
                   [-yaw_rate/2, delta_time_step, distance_travel],
                   [0.0, delta_time_step, distance_travel]]
-    # action_set = [[yaw_rate, delta_time_step, distance_travel],
-    #               [-yaw_rate, delta_time_step, distance_travel],
-    #               [0.0, delta_time_step, distance_travel]]
-    
-    
     
     return action_set
 
@@ -258,7 +253,6 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
 
 def main():
 
-    #map()에 정보가 다 있음.
     start, goal, obstacle_list, space = map()
 
     if show_animation == True:
@@ -273,7 +267,7 @@ def main():
             obs.plot()
 
         plt.axis(space)
-        plt.grid(True)
+        # plt.grid(True)
         plt.xlabel("X [m]"), plt.ylabel("Y [m]")
         plt.title("Hybrid a star algorithm", fontsize=20)
 
