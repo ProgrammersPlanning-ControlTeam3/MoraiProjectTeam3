@@ -281,9 +281,9 @@ class stanley:
 
         self.target_velocity = 40  # Target Velocity in m/s
 
-        self.k = 1.5  # Stanley Gain
-        self.k_psi = 1.0  # For heading Error
-        self.k_y = 4.0  # For CTR Error
+        self.k = 0.5  # Stanley Gain
+        self.k_psi = 0.5  # For heading Error
+        self.k_y = 1.0  # For CTR Error
 
         # self.k = 1.1  # Stanley Gain
         # self.k_psi = 0.8  # For heading Error
@@ -293,7 +293,12 @@ class stanley:
         self.alpha = 9
 
         self.vehicle_length = 5.155  # Vehicle Length
-        self.lfd = 10  # Look forward Distance
+
+        self.lfd = 1
+        self.min_lfd = 4 
+        self.max_lfd = 30 
+        self.lfd_gain = 0.8 
+
         if self.vehicle_length is None or self.lfd is None:
             print("you need to change values at line 57~58 ,  self.vegicle_length , lfd")
             exit()
@@ -349,52 +354,65 @@ class stanley:
 
     def calc_stanley_control(self):
         if not self.is_path or not self.is_odom:
-            return 0.0  # No control if path or odom is not available
+            return 0.0
 
-        min_distance = float('inf')
+        current_velocity = self.status_msg.velocity.x
+        self.lfd = self.lfd_gain * current_velocity
+        self.lfd = np.clip(self.lfd, self.min_lfd, self.max_lfd)
+        print(self.lfd)
 
-        # Cross track error
-        path_point = self.path.poses[0].pose.position
-        dx = self.current_position.x - path_point.x
-        dy = self.current_position.y - path_point.y
+        lookahead_distance = self.lfd
+        lookahead_point = None
+        cumulative_distance = 0.0
+
+        for i in range(len(self.path.poses) - 1):
+            dx = self.path.poses[i + 1].pose.position.x - self.path.poses[i].pose.position.x
+            dy = self.path.poses[i + 1].pose.position.y - self.path.poses[i].pose.position.y
+            segment_distance = sqrt(dx ** 2 + dy ** 2)
+            cumulative_distance += segment_distance
+
+            if cumulative_distance >= lookahead_distance:
+                lookahead_point = self.path.poses[i + 1].pose.position
+                break
+
+        if lookahead_point is None:
+            lookahead_point = self.path.poses[-1].pose.position
+
+        # CTE
+        dx = lookahead_point.x - self.current_position.x
+        dy = lookahead_point.y - self.current_position.y
         cos_yaw = cos(self.vehicle_yaw)
         sin_yaw = sin(self.vehicle_yaw)
         cross_track_error = dx * sin_yaw - dy * cos_yaw
 
-        if abs(cross_track_error) < 100:  # 이상치 제거를 위한 조건 추가
+        if abs(cross_track_error) < 100:
             self.errors.append(abs(cross_track_error))
 
         cross_track_error = np.clip(cross_track_error, -self.max_cross_track_error, self.max_cross_track_error)
 
-        path_point_local_x = cos(self.vehicle_yaw) * (path_point.x - self.current_position.x) + sin(self.vehicle_yaw) * (path_point.y - self.current_position.y)
-        path_point_local_y = -sin(self.vehicle_yaw) * (path_point.x - self.current_position.x) + cos(self.vehicle_yaw) * (path_point.y - self.current_position.y)
+        path_point_local_x = cos(self.vehicle_yaw) * (lookahead_point.x - self.current_position.x) + sin(self.vehicle_yaw) * (lookahead_point.y - self.current_position.y)
+        path_point_local_y = -sin(self.vehicle_yaw) * (lookahead_point.x - self.current_position.x) + cos(self.vehicle_yaw) * (lookahead_point.y - self.current_position.y)
 
         if path_point_local_y > 0:
             cross_track_error = abs(cross_track_error)
         else:
             cross_track_error = -abs(cross_track_error)
 
-        lookahead_idx = 8  # Look ahead points
-        if lookahead_idx >= len(self.path.poses):
-            lookahead_idx = len(self.path.poses) - 1
-        dx = self.path.poses[lookahead_idx].pose.position.x - self.path.poses[0].pose.position.x
-        dy = self.path.poses[lookahead_idx].pose.position.y - self.path.poses[0].pose.position.y
+        dx = lookahead_point.x - self.current_position.x
+        dy = lookahead_point.y - self.current_position.y
         path_heading = atan2(dy, dx)
         heading_error = path_heading - self.vehicle_yaw
 
-        # Normalize heading error to the range [-pi, pi]
+        # [-pi, pi]
         while heading_error > pi:
             heading_error -= 2 * pi
         while heading_error < -pi:
             heading_error += 2 * pi
 
-        # Speed-dependent factor (alpha)
-        alpha = self.alpha / max(self.status_msg.velocity.x, 0.1)  # Prevent division by zero
+        # alpha
+        alpha = self.alpha / max(self.status_msg.velocity.x, 0.1)
 
-        # Calculate steering using Stanley method
         CTR = atan2(self.k * cross_track_error, self.target_velocity)
-
-        # Desired input with speed-dependent heading error
         steering = (self.k_psi * heading_error * alpha) + (self.k_y * CTR)
 
         return steering
@@ -444,31 +462,31 @@ def plot_paths(global_path, x_ego, y_ego, total_time, variance, mean_error, max_
 
     plt.show()
 
-if __name__ == "__main__":
-    rospy.init_node('path_tracking_node', anonymous=True)
+# if __name__ == "__main__":
+#     rospy.init_node('path_tracking_node', anonymous=True)
 
-    pure_pursuit_controller = pure_pursuit_no_npc()
-    stanley_controller = stanley()
+#     pure_pursuit_controller = pure_pursuit_no_npc()
+#     stanley_controller = stanley()
 
-    rate = rospy.Rate(10)  # 10 Hz
-    while not rospy.is_shutdown():
-        if pure_pursuit_controller.is_path and pure_pursuit_controller.is_odom and pure_pursuit_controller.is_status:
-            pure_pursuit_controller.calc_pure_pursuit()
-        if stanley_controller.is_path and stanley_controller.is_odom and stanley_controller.is_status:
-            stanley_controller.calc_stanley_control()
-        rate.sleep()
+#     rate = rospy.Rate(10)  # 10 Hz
+#     while not rospy.is_shutdown():
+#         if pure_pursuit_controller.is_path and pure_pursuit_controller.is_odom and pure_pursuit_controller.is_status:
+#             pure_pursuit_controller.calc_pure_pursuit()
+#         if stanley_controller.is_path and stanley_controller.is_odom and stanley_controller.is_status:
+#             stanley_controller.calc_stanley_control()
+#         rate.sleep()
 
-    # End the simulation by setting the end time
-    pure_pursuit_controller.set_end_time()
-    stanley_controller.set_end_time()
+#     # End the simulation by setting the end time
+#     pure_pursuit_controller.set_end_time()
+#     stanley_controller.set_end_time()
 
-    if pure_pursuit_controller.path is not None:
-        mean_error, max_error, variance = pure_pursuit_controller.calculate_statistics()
-        plot_paths(pure_pursuit_controller.path, pure_pursuit_controller.x_ego, pure_pursuit_controller.y_ego,
-                   pure_pursuit_controller.calculate_total_time(), variance, mean_error, max_error)
+#     if pure_pursuit_controller.path is not None:
+#         mean_error, max_error, variance = pure_pursuit_controller.calculate_statistics()
+#         plot_paths(pure_pursuit_controller.path, pure_pursuit_controller.x_ego, pure_pursuit_controller.y_ego,
+#                    pure_pursuit_controller.calculate_total_time(), variance, mean_error, max_error)
 
-    if stanley_controller.global_path is not None:
-        mean_error, max_error, variance = stanley_controller.calculate_statistics()
-        plot_paths(stanley_controller.global_path, stanley_controller.x_ego, stanley_controller.y_ego,
-                   stanley_controller.calculate_total_time(), variance, mean_error, max_error)
+#     if stanley_controller.global_path is not None:
+#         mean_error, max_error, variance = stanley_controller.calculate_statistics()
+#         plot_paths(stanley_controller.global_path, stanley_controller.x_ego, stanley_controller.y_ego,
+#                    stanley_controller.calculate_total_time(), variance, mean_error, max_error)
 
