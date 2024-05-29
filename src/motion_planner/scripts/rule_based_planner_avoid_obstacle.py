@@ -23,7 +23,8 @@ sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 #print(sys.path)
 
 from control.scripts.pid_controller import pidControl
-from control.scripts.lateral_controller import pure_pursuit
+from control.scripts.lateral_controller import stanley
+# from control.scripts.lateral_controller import pure_pursuit
 from control.scripts.longitudinal_controller import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
 
@@ -63,7 +64,8 @@ class rule_based_planner:
         # 제어 시스템 및 알고리즘 초기화 부분
         self.pid = pidControl() # PID Control
         self.vel_planning = velocityPlanning(self.target_velocity / 3.6, 0.15) # Velocity Control
-        self.pure_pursuit = pure_pursuit() # Pure Pursuit control
+        self.stanley = stanley() 
+        # self.pure_pursuit = pure_pursuit() # Pure Pursuit control
         # self.object_detector = object_detector() # Object Detection to avoid
 
         # 무한 루프: self.is_global_path가 True로 설정될때까지 계속 실행.
@@ -81,10 +83,14 @@ class rule_based_planner:
             if self.is_path == True and self.is_odom == True and self.is_status == True: # Everything is OK
                 prev_time = time.time()
 
-                self.current_waypoint = self.pure_pursuit.get_current_waypoint(self.status_msg, self.global_path)
+                self.current_waypoint = self.stanley.get_current_waypoint(self.status_msg, self.global_path)
+                # self.current_waypoint = self.pure_pursuit.get_current_waypoint(self.status_msg, self.global_path)
+
                 self.target_velocity = self.velocity_list[self.current_waypoint] * 3.6
 
-                steering = self.pure_pursuit.calc_pure_pursuit()
+                steering = self.stanley.calc_stanley_control()
+                # steering = self.pure_pursuit.calc_pure_pursuit()
+
 
                 if self.is_look_forward_point:
                     self.ctrl_cmd_msg.steering = steering

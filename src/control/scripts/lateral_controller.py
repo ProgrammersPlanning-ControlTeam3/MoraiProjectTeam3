@@ -265,7 +265,7 @@ class pure_pursuit:
 class stanley:
     def __init__(self):
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
-        rospy.Subscriber("/local_path", Path, self.path_callback)
+        rospy.Subscriber("/lattice_path", Path, self.path_callback)
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
 
@@ -281,16 +281,16 @@ class stanley:
 
         self.target_velocity = 40  # Target Velocity in m/s
 
-        self.k = 1.4  # Stanley Gain
-        self.k_psi = 0.8  # For heading Error
-        self.k_y = 1.0  # For CTR Error
+        self.k = 1.5  # Stanley Gain
+        self.k_psi = 1.0  # For heading Error
+        self.k_y = 4.0  # For CTR Error
 
         # self.k = 1.1  # Stanley Gain
         # self.k_psi = 0.8  # For heading Error
         # self.k_y = 0.75  # For CTR Error
 
-        self.max_cross_track_error = 1.0  # Maximum cross track error
-        self.alpha = 5
+        self.max_cross_track_error = 0.4  # Maximum cross track error
+        self.alpha = 9
 
         self.vehicle_length = 5.155  # Vehicle Length
         self.lfd = 10  # Look forward Distance
@@ -348,38 +348,24 @@ class stanley:
         return current_waypoint
 
     def calc_stanley_control(self):
-        if not self.is_global_path or not self.is_odom:
+        if not self.is_path or not self.is_odom:
             return 0.0  # No control if path or odom is not available
 
         min_distance = float('inf')
-        nearest_idx = -1
-
-        # Find the point on the path closest to the vehicle
-        for i, pose in enumerate(self.global_path.poses):
-            dx = self.current_position.x - pose.pose.position.x
-            dy = self.current_position.y - pose.pose.position.y
-            distance = sqrt(dx ** 2 + dy ** 2)
-            if distance < min_distance:
-                min_distance = distance
-                nearest_idx = i
-
-        if nearest_idx == -1:
-            rospy.logwarn("No nearest point found.")
-            return 0.0
 
         # Cross track error
-        nearest_point = self.global_path.poses[nearest_idx].pose.position
-        dx = self.current_position.x - nearest_point.x
-        dy = self.current_position.y - nearest_point.y
+        path_point = self.path.poses[0].pose.position
+        dx = self.current_position.x - path_point.x
+        dy = self.current_position.y - path_point.y
         cos_yaw = cos(self.vehicle_yaw)
         sin_yaw = sin(self.vehicle_yaw)
         cross_track_error = dx * sin_yaw - dy * cos_yaw
 
-        cross_track_error = np.clip(cross_track_error, -self.max_cross_track_error, self.max_cross_track_error)
         if abs(cross_track_error) < 100:  # 이상치 제거를 위한 조건 추가
             self.errors.append(abs(cross_track_error))
 
-        path_point = self.global_path.poses[nearest_idx].pose.position
+        cross_track_error = np.clip(cross_track_error, -self.max_cross_track_error, self.max_cross_track_error)
+
         path_point_local_x = cos(self.vehicle_yaw) * (path_point.x - self.current_position.x) + sin(self.vehicle_yaw) * (path_point.y - self.current_position.y)
         path_point_local_y = -sin(self.vehicle_yaw) * (path_point.x - self.current_position.x) + cos(self.vehicle_yaw) * (path_point.y - self.current_position.y)
 
@@ -388,11 +374,11 @@ class stanley:
         else:
             cross_track_error = -abs(cross_track_error)
 
-        lookahead_idx = nearest_idx + 8  # Look ahead points
-        if lookahead_idx >= len(self.global_path.poses):
-            lookahead_idx = len(self.global_path.poses) - 1
-        dx = self.global_path.poses[lookahead_idx].pose.position.x - self.global_path.poses[nearest_idx].pose.position.x
-        dy = self.global_path.poses[lookahead_idx].pose.position.y - self.global_path.poses[nearest_idx].pose.position.y
+        lookahead_idx = 8  # Look ahead points
+        if lookahead_idx >= len(self.path.poses):
+            lookahead_idx = len(self.path.poses) - 1
+        dx = self.path.poses[lookahead_idx].pose.position.x - self.path.poses[0].pose.position.x
+        dy = self.path.poses[lookahead_idx].pose.position.y - self.path.poses[0].pose.position.y
         path_heading = atan2(dy, dx)
         heading_error = path_heading - self.vehicle_yaw
 
@@ -461,13 +447,13 @@ def plot_paths(global_path, x_ego, y_ego, total_time, variance, mean_error, max_
 if __name__ == "__main__":
     rospy.init_node('path_tracking_node', anonymous=True)
 
-    pure_pursuit_controller = pure_pursuit()
+    pure_pursuit_controller = pure_pursuit_no_npc()
     stanley_controller = stanley()
 
     rate = rospy.Rate(10)  # 10 Hz
     while not rospy.is_shutdown():
         if pure_pursuit_controller.is_path and pure_pursuit_controller.is_odom and pure_pursuit_controller.is_status:
-            pure_pursuit_controller.calc_pure_pursuit_no_npc()
+            pure_pursuit_controller.calc_pure_pursuit()
         if stanley_controller.is_path and stanley_controller.is_odom and stanley_controller.is_status:
             stanley_controller.calc_stanley_control()
         rate.sleep()
