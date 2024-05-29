@@ -283,9 +283,14 @@ class stanley:
 
         self.k = 1.4  # Stanley Gain
         self.k_psi = 0.8  # For heading Error
-        self.k_y = 1  # For CTR Error
+        self.k_y = 1.0  # For CTR Error
+
+        # self.k = 1.1  # Stanley Gain
+        # self.k_psi = 0.8  # For heading Error
+        # self.k_y = 0.75  # For CTR Error
 
         self.max_cross_track_error = 1.0  # Maximum cross track error
+        self.alpha = 5
 
         self.vehicle_length = 5.155  # Vehicle Length
         self.lfd = 10  # Look forward Distance
@@ -397,13 +402,17 @@ class stanley:
         while heading_error < -pi:
             heading_error += 2 * pi
 
+        # Speed-dependent factor (alpha)
+        alpha = self.alpha / max(self.status_msg.velocity.x, 0.1)  # Prevent division by zero
+
         # Calculate steering using Stanley method
         CTR = atan2(self.k * cross_track_error, self.target_velocity)
 
-        # Desired input
-        steering = self.k_psi * heading_error + self.k_y * CTR
+        # Desired input with speed-dependent heading error
+        steering = (self.k_psi * heading_error * alpha) + (self.k_y * CTR)
 
         return steering
+
 
     def calculate_statistics(self):
         if len(self.errors) > 0:
@@ -451,10 +460,10 @@ def plot_paths(global_path, x_ego, y_ego, total_time, variance, mean_error, max_
 
 if __name__ == "__main__":
     rospy.init_node('path_tracking_node', anonymous=True)
-    
+
     pure_pursuit_controller = pure_pursuit()
     stanley_controller = stanley()
-    
+
     rate = rospy.Rate(10)  # 10 Hz
     while not rospy.is_shutdown():
         if pure_pursuit_controller.is_path and pure_pursuit_controller.is_odom and pure_pursuit_controller.is_status:
@@ -471,12 +480,9 @@ if __name__ == "__main__":
         mean_error, max_error, variance = pure_pursuit_controller.calculate_statistics()
         plot_paths(pure_pursuit_controller.path, pure_pursuit_controller.x_ego, pure_pursuit_controller.y_ego,
                    pure_pursuit_controller.calculate_total_time(), variance, mean_error, max_error)
-    else:
-        rospy.logwarn("Pure Pursuit Controller Path is None, skipping plot.")
 
     if stanley_controller.global_path is not None:
         mean_error, max_error, variance = stanley_controller.calculate_statistics()
         plot_paths(stanley_controller.global_path, stanley_controller.x_ego, stanley_controller.y_ego,
                    stanley_controller.calculate_total_time(), variance, mean_error, max_error)
-    else:
-        rospy.logwarn("Stanley Controller Global Path is None, skipping plot.")
+
