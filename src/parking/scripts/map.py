@@ -42,7 +42,7 @@ def map():
 
         DataX = DataPos['x']
         DataY = DataPos['y']
-        collision_weight = 1
+        collision_weight = 1.2
         if DataId == obstacleId['car'] :
             obs = obstacle.RectangleObstacle(DataX,DataY,car_size[0],car_size[1],DataYaw,collision_weight)
             obstacleList.append(obs)
@@ -50,6 +50,7 @@ def map():
         elif DataId == obstacleId['corn'] :
             obs = obstacle.Obstacle(DataX,DataY, 1. , 2)
             obstacleList.append(obs)
+            
     # obstacleList = []
 
     return start, goal, obstacleList, space
