@@ -5,6 +5,7 @@ import math
 import matplotlib.pyplot as plt
 import random
 import time
+from dubins import Dubins
 from obstacle import Obstacle
 from map import map
 
@@ -128,13 +129,13 @@ def collision_check(position_parent, yaw_rate, delta_time_step, obstacle_list, V
         # obs_x , obs_y, obs_r = obstacle
         # distance = distanceBetweenLindAndCircle(m,b,(obs_x,obs_y))
         # obstacle.is_inside(cx,cy)
-        dist_list = []
-        for center in obstacle.get_center():
-            dist = distanceBetweenLindAndCircle(m,b,(center[0],center[1]))
-            dist_list.append(dist)
-        min_dist = min(dist_list)
-
-        if obstacle.is_inside(cx,cy) or (min_dist <= obstacle.r) :
+        # dist_list = []
+        # for center in obstacle.get_center():
+        #     dist = distanceBetweenLindAndCircle(m,b,(center[0],center[1]))
+        #     dist_list.append(dist)
+        # min_dist = min(dist_list)
+        
+        if obstacle.is_inside(cx,cy) :
             col = True
             return True
 
@@ -279,13 +280,22 @@ def main():
         plt.xlabel("X [m]"), plt.ylabel("Y [m]")
         plt.title("Hybrid a star algorithm", fontsize=20)
 
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.05)
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
 
     print("Optimal path found!")
+    len_opt_path = len(opt_path)
+    #dubins
+    dubins = Dubins()
+    kappa_ = .25/2.0
+    dubins_base = [opt_path[0],opt_path[int(0.3*len_opt_path)],opt_path[int(0.6*len_opt_path)],opt_path[-1]]
+    for i in range(len(dubins_base)-1) :
+        cartesian_path, controls, dubins_path = dubins.plan(dubins_base[i], dubins_base[i+1], kappa_)
+        path_x, path_y, path_yaw = cartesian_path
+        plt.plot(path_x, path_y, 'g-')
+    # print(dubins_base)
+
+
     opt_path = np.array(opt_path)
-    # print(opt_path)
-    
-    #optimal path
     if show_animation == True:
         plt.plot(opt_path[:,0], opt_path[:,1], "m.-")
         plt.show()
