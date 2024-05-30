@@ -4,7 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import obstacle as obstacle
 from scenarioLoader import ScenarioLoader
+"""
+시나리오 파일을 바탕으로 주차장 map의 정보를 받아 옵니다.
 
+"""
 def pify(alpha):
     v = np.fmod(alpha, 2*np.pi)
     if (v < - np.pi):
