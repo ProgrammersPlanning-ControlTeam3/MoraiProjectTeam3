@@ -9,6 +9,11 @@ from dubins import Dubins
 from obstacle import Obstacle
 from map import map
 
+
+from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Path
+from lib.mgeo.class_defs import *
+
 show_animation  = True
 """
 ###################차량 스펙##################
@@ -273,11 +278,13 @@ def main():
     print("Optimal path found!")
     len_opt_path = len(opt_path)
 
-    #dubins
+    #Dubins
     dubins = Dubins()
     kappa_ = .25/2.0
     dubins_base = [opt_path[0],opt_path[int(0.3*len_opt_path)],opt_path[int(0.6*len_opt_path)],opt_path[-1]]
     dubins_global_path = []
+    
+    #포인트 간의 dubins path 를 추출해줌
     for i in range(len(dubins_base)-1) :
         cartesian_path, _, _ = dubins.plan(dubins_base[i], dubins_base[i+1], kappa_)
         path_x, path_y, path_yaw = cartesian_path
@@ -291,6 +298,40 @@ def main():
         plt.plot(opt_path[:,0], opt_path[:,1], "m.-")
         plt.show()
 
+def get_hybrid_a_star_dubins_global_path():
+
+    start, goal, obstacle_list, space = map()
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
+    print("Optimal path found!")
+    len_opt_path = len(opt_path)
+
+    #Dubins
+    dubins = Dubins()
+    kappa_ = .25/2.0
+    dubins_base = [opt_path[0],opt_path[int(0.3*len_opt_path)],opt_path[int(0.6*len_opt_path)],opt_path[-1]]
+    dubins_global_path = []
+    dubins_x = []
+    dubins_y = []
+
+    #포인트 간의 dubins path 를 추출해줌
+    #global path = x,y,
+    for i in range(len(dubins_base)-1) :
+        cartesian_path, _, _ = dubins.plan(dubins_base[i], dubins_base[i+1], kappa_)
+        path_x, path_y, path_yaw = cartesian_path
+        dubins_x += path_x
+        dubins_y += path_y
+    dubins_waypoint = zip(dubins_x,dubins_y)
+
+    for waypoint in dubins_waypoint :
+        path_x = waypoint[0]
+        path_y = waypoint[1]
+        read_pose = PoseStamped()
+        read_pose.pose.position.x = path_x
+        read_pose.pose.position.y = path_y
+        read_pose.pose.orientation.w = 1
+        dubins_global_path.poses.append(read_pose)
+        
+    return dubins_global_path
 
 if __name__ == "__main__":
     main()
