@@ -1,4 +1,5 @@
 import numpy as np
+import rospy
 
 def get_frenet(x, y, mapx, mapy):
     next_wp = next_waypoint(x, y, mapx, mapy)
@@ -60,6 +61,12 @@ def get_cartesian(s, d, mapx, mapy, maps):
 
 def next_waypoint(x, y, mapx, mapy):
     closest_wp = get_closest_waypoints(x, y, mapx, mapy)
+
+    if closest_wp >= len(mapx) or closest_wp < 0:
+        closest_wp = len(mapx) - 1
+        rospy.loginfo("waypoint index is out of range.")
+
+
     map_x = mapx[closest_wp]
     map_y = mapy[closest_wp]
 
@@ -75,9 +82,10 @@ def next_waypoint(x, y, mapx, mapy):
 
     return closest_wp
 
+
 def get_closest_waypoints(x, y, mapx, mapy):
     min_len = 1e10
-    closest_wp = 0
+    closest_wp = -1
 
     for i in range(len(mapx)):
         _mapx = mapx[i]
@@ -87,6 +95,9 @@ def get_closest_waypoints(x, y, mapx, mapy):
         if dist < min_len:
             min_len = dist
             closest_wp = i
+
+    if closest_wp == -1:
+        rospy.loginfo("Invalid waypoint")
 
     return closest_wp
 
