@@ -281,16 +281,16 @@ class stanley:
 
         self.target_velocity = 40  # Target Velocity in m/s
 
-        self.k = 0.5  # Stanley Gain
+        self.k = 1  # Stanley Gain
         self.k_psi = 0.5  # For heading Error
-        self.k_y = 1.0  # For CTR Error
+        self.k_y = 1.5  # For CTR Error
 
         # self.k = 1.1  # Stanley Gain
         # self.k_psi = 0.8  # For heading Error
         # self.k_y = 0.75  # For CTR Error
 
         self.max_cross_track_error = 0.4  # Maximum cross track error
-        self.alpha = 9
+        self.alpha = 5
 
         self.vehicle_length = 5.155  # Vehicle Length
 

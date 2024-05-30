@@ -94,7 +94,7 @@ class latticePlanner:
     def collision_check(self, object_data, out_path):
         # TODO: (6) 생성된 충돌회피 경로 중 낮은 비용의 경로 선택
         selected_lane = -1
-        lane_weight = [10, 40, 150, 1, 30, 100]
+        lane_weight = [10, 15, 20, 1, 5, 10]
 
         for obstacle in object_data.npc_list:
             for path_num in range(len(out_path)):
