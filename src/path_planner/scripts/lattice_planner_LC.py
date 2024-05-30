@@ -36,18 +36,22 @@ class latticePlanner:
         self.object_path = None
         self.deleted_ids = set()
 
+        self.foward_vehicle_speed = 0
+        self.target_velocity = 40  # Target Velocity in m/s
+
         rate = rospy.Rate(30)  # 30hz
         while not rospy.is_shutdown():
             if self.is_path and self.is_status and self.is_obj:
                 if self.checkObject(self.local_path, self.object_data, self.object_path):
+                    self.foward_vehicle_speed = self.get_forward_vehicle(self.local_path, self.object_data)
                     lattice_path = self.latticePlanner(self.local_path, self.status_msg)
                     lattice_path_index = self.collision_check(self.object_data, lattice_path)
-
                     # (7)  lattice 경로 메세지 Publish
                     self.lattice_path_pub.publish(lattice_path[lattice_path_index])
                 else:
                     self.lattice_path_pub.publish(self.local_path)
             rate.sleep()
+
 
     def transform_to_local(self, global_position, reference_position, reference_theta):
         translation = np.array([global_position.x - reference_position.x,
@@ -56,6 +60,26 @@ class latticePlanner:
                                     [sin(-reference_theta), cos(-reference_theta)]])
         local_position = rotation_matrix.dot(translation)
         return Point(x=local_position[0], y=local_position[1], z=0)
+
+
+    def get_forward_vehicle(self, ref_path, object_data):
+
+        forward_vehicle = ref_path.poses[0].pose.position
+        forward_theta = atan2(ref_path.poses[1].pose.position.y - forward_vehicle.y,
+                      ref_path.poses[1].pose.position.x - forward_vehicle.x)
+
+        local_path = [self.transform_to_local(pose.pose.position, forward_vehicle, forward_theta) for pose in ref_path.poses]
+
+        for local_pose in local_path:
+            for npc in object_data.npc_list:
+                local_npc_position = self.transform_to_local(npc.position, forward_vehicle, forward_theta)
+                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1:
+                    # print("Vehicle ahead : ", local_npc_position.x - local_pose.x)
+                    # print(npc.velocity.x)
+                    return npc.velocity.x
+
+        return None
+
 
     def checkObject(self, ref_path, object_data, object_path):
         def is_collision_distance(path_pose, obj_position, threshold):
@@ -192,9 +216,13 @@ class latticePlanner:
                     lattice_path.header.frame_id = 'map'
                     goal_d_with_offset = vehicle_d + lane_offset 
 
-                    #ToDo Need to change to forward vehicle's speed (?)
-                    # goal_s_with_offset = vehicle_s + vehicle_velocity * time_offset
-                    goal_s_with_offset = vehicle_s + 30 * time_offset
+                    # forward vehicle's speed based target point
+                    if self.foward_vehicle_speed is not None:
+                        goal_s_with_offset = vehicle_s + self.foward_vehicle_speed * time_offset
+                    else :
+                        goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
+                    # goal_s_with_offset = vehicle_s + 30 * time_offset
+
 
                     # 5차 곡선
                     xs = 0
