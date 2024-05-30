@@ -103,9 +103,7 @@ def calculate_line_equation(point1, point2):
     x1, y1 = point1[:2]
     x2, y2 = point2[:2]
 
-    #m = 기울기
     m = (y2 - y1) / (x2 - x1) if x2 != x1 else float('inf')
-    #b = 절편
     b = y1 - m * x1 if m != float('inf') else x1  # y = mx + b
 
     return m, b
@@ -121,20 +119,12 @@ def collision_check(position_parent, yaw_rate, delta_time_step, obstacle_list, V
     cy = position_child[1]
 
     # 부모 노드와 아들노드 사이를 잇는 직선
-    m ,b = calculate_line_equation(position_parent,position_child)
-    grad = (cy-py) / (cx-px)
+    # m ,b = calculate_line_equation(position_parent,position_child)
+    # grad = (cy-py) / (cx-px)
 
     col = False
     for obstacle in obstacle_list:
-        # obs_x , obs_y, obs_r = obstacle
-        # distance = distanceBetweenLindAndCircle(m,b,(obs_x,obs_y))
-        # obstacle.is_inside(cx,cy)
-        # dist_list = []
-        # for center in obstacle.get_center():
-        #     dist = distanceBetweenLindAndCircle(m,b,(center[0],center[1]))
-        #     dist_list.append(dist)
-        # min_dist = min(dist_list)
-        
+
         if obstacle.is_inside(cx,cy) :
             col = True
             return True
@@ -162,7 +152,6 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
     cnt = 0
     open_list = []
     closed_list = []
-    # min_x, max_x, min_y, max_y = space
     yaw_rate = Vx / R
     open_list.append(start_node)
 
@@ -171,7 +160,6 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
         cur_node = open_list[0]
         cur_index = 0
 
-        # print("######searching##########")
         for index, node in enumerate(open_list):
             # print(node.position, node.f)
             if node.f < cur_node.f :
@@ -278,21 +266,24 @@ def main():
         plt.axis(space)
         # plt.grid(True)
         plt.xlabel("X [m]"), plt.ylabel("Y [m]")
-        plt.title("Hybrid a star algorithm", fontsize=20)
+        # plt.title("Hybrid a star algorithm", fontsize=20)
 
     opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
 
     print("Optimal path found!")
     len_opt_path = len(opt_path)
+
     #dubins
     dubins = Dubins()
     kappa_ = .25/2.0
     dubins_base = [opt_path[0],opt_path[int(0.3*len_opt_path)],opt_path[int(0.6*len_opt_path)],opt_path[-1]]
+    dubins_global_path = []
     for i in range(len(dubins_base)-1) :
-        cartesian_path, controls, dubins_path = dubins.plan(dubins_base[i], dubins_base[i+1], kappa_)
+        cartesian_path, _, _ = dubins.plan(dubins_base[i], dubins_base[i+1], kappa_)
         path_x, path_y, path_yaw = cartesian_path
         plt.plot(path_x, path_y, 'g-')
-    # print(dubins_base)
+        
+    print(path_x)
 
 
     opt_path = np.array(opt_path)
