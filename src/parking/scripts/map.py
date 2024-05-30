@@ -6,6 +6,9 @@ import obstacle as obstacle
 from scenarioLoader import ScenarioLoader
 """
 시나리오 파일을 바탕으로 주차장 map의 정보를 받아 옵니다.
+TO DO:
+시나리오 파일을 통해 goal,start Data가 잘 받아지는 지 확인
+(랜덤시나리오 제작 후에도 잘 동작하는지 확인하기)
 
 """
 def pify(alpha):
@@ -21,6 +24,7 @@ def degrees_to_radians(degrees):
 
 def map():
     # Start, goal : [x, y, theta]
+    # default value == hard cording
     start = [5.5, 1068.8048, degrees_to_radians(-35.765)]
     goal = [5.25, 1021.73, degrees_to_radians(-120.769)]
 
@@ -35,7 +39,18 @@ def map():
         'corn' : 40100003
     }
 
+    #load Data (start, goal , obstacle) from Scenario file
     scenario = ScenarioLoader()
+    start_data = scenario.getParkingLotStart()
+    start_pos = start_data['pos']
+    start_yaw = degrees_to_radians(float(start_data['rot']['yaw']))
+    start = [start_pos['x'],start_pos['y'],start_yaw]
+    
+    goal_data = scenario.getParkingLotGoal()
+    goal_pos = goal_data['pos']
+    goal_yaw = degrees_to_radians(float(goal_data['rot']['yaw']))
+    goal = [goal_pos['x'],goal_pos['y'],goal_yaw]
+
     objectList = scenario.getObject()
 
     for object in objectList :
@@ -53,8 +68,7 @@ def map():
         elif DataId == obstacleId['corn'] :
             obs = obstacle.Obstacle(DataX,DataY, 1. , 2)
             obstacleList.append(obs)
-            
-    # obstacleList = []
+
 
     return start, goal, obstacleList, space
 
