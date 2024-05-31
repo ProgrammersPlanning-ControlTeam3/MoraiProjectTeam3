@@ -38,6 +38,7 @@ class latticePlanner:
 
         self.foward_vehicle_speed = 0
         self.target_velocity = 40  # Target Velocity in m/s
+        self.local_path_size = 30
 
         rate = rospy.Rate(30)  # 30hz
         while not rospy.is_shutdown():
@@ -115,32 +116,92 @@ class latticePlanner:
                             return True
         return False
 
+
     def collision_check(self, object_data, out_path):
+
+        def cost_function(dist, i):
+            cost = -(dist - i)**2 + 20
+            return cost
+
         # TODO: (6) 생성된 충돌회피 경로 중 낮은 비용의 경로 선택
         selected_lane = -1
-        lane_weight = [10, 15, 20, 1, 5, 10]
+        lane_weight = [3,2,1,3,2,1]
 
         for obstacle in object_data.npc_list:
             for path_num in range(len(out_path)):
                 for path_pos in out_path[path_num].poses:
+
                     dis = sqrt(
-                        pow(obstacle.position.x - path_pos.pose.position.x, 2) + pow(obstacle.position.y - path_pos.pose.position.y, 2))
+                        pow(obstacle.position.x - path_pos.pose.position.x, 2) +
+                        pow(obstacle.position.y - path_pos.pose.position.y, 2)
+                    )
 
-                    # weight based on distance
-                    if dis < 10:
-                        weight_increase = 20
-                    elif dis < 25:
-                        weight_increase = 10
-                    elif dis < 40:
-                        weight_increase = 5
+                    if dis < 4:
+                        centre = 0
+                    elif dis < 8:
+                        centre = 1
+                    elif dis < 12:
+                        centre = 2
+                    elif dis < 16:
+                        centre = 3
+                    elif dis < 20:
+                        centre = 4
                     else:
-                        weight_increase = 0
-                    lane_weight[path_num] += weight_increase
+                        centre = 5
 
-        selected_lane = lane_weight.index(min(lane_weight))
+                    lane_weight[path_num] += cost_function(centre, path_num)
+
+
+        selected_lane = lane_weight.index(max(lane_weight))
         print("Lane change : ", selected_lane)
 
         return selected_lane
+
+
+
+    # def collision_check(self, object_data, out_path):
+    #     # TODO: (6) 생성된 충돌회피 경로 중 낮은 비용의 경로 선택
+    #     selected_lane = -1
+    #     lane_weight = [11, 12, 13, 1, 2, 3]
+
+
+    #     # TODO remove comment
+    #     # path_size = self.foward_vehicle_speed
+    #     path_size = 50
+
+    #     # if self.foward_vehicle_speed is None:
+    #     #     path_size = self.local_path_size
+
+    #     short_path_size = path_size * 0.6
+
+    #     for obstacle in object_data.npc_list:
+    #         for path_num in range(len(out_path)):
+    #             for path_pos in out_path[path_num].poses:
+    #                 dis = sqrt(
+    #                     pow(obstacle.position.x - path_pos.pose.position.x, 2) + pow(obstacle.position.y - path_pos.pose.position.y, 2))
+
+    #                 # apply weight to all paths
+    #                 if dis < short_path_size:
+    #                     if path_num < 3:
+    #                         weight_increase = 10
+    #                     else:
+    #                         weight_increase = 30
+    #                 # weight to 3, 4, 5 paths only
+    #                 elif short_path_size <= dis < path_size:
+    #                     if path_num < 3:
+    #                         weight_increase = 30
+    #                     else:
+    #                         weight_increase = 0
+    #                 else:
+    #                     weight_increase = 0
+
+    #                 lane_weight[path_num] += weight_increase
+
+
+    #     selected_lane = lane_weight.index(min(lane_weight))
+    #     print("Lane change : ", selected_lane)
+
+    #     return selected_lane
 
     def path_callback(self, msg):
         self.is_path = True
@@ -167,6 +228,8 @@ class latticePlanner:
 
     def generate_5th_order_polynomial(self, ys, yf, xs, xf):
         # 5차 곡선 계수 계산
+        if xf == 0:
+            return [ys, 0, 0, 0, 0, 0]  # xf가 0일 경우를 처리
         a0 = ys
         a1 = 0
         a2 = 0
@@ -207,7 +270,7 @@ class latticePlanner:
             vehicle_s, vehicle_d = get_frenet(vehicle_pose_x, vehicle_pose_y, mapx, mapy)
 
             goal_s, goal_d = get_frenet(global_ref_end_point[0], global_ref_end_point[1], mapx, mapy)
-            lane_offsets = [3, 4, 5]
+            lane_offsets = [5, 4.25, 3.5]
             time_offsets = [0.6, 1.0]
 
             for time_offset in time_offsets:
@@ -216,12 +279,13 @@ class latticePlanner:
                     lattice_path.header.frame_id = 'map'
                     goal_d_with_offset = vehicle_d + lane_offset 
 
+                    # TODO remove comment
                     # forward vehicle's speed based target point
-                    if self.foward_vehicle_speed is not None:
-                        goal_s_with_offset = vehicle_s + self.foward_vehicle_speed * time_offset
-                    else :
-                        goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
-                    # goal_s_with_offset = vehicle_s + 30 * time_offset
+                    # if self.foward_vehicle_speed is not None:
+                    #     goal_s_with_offset = vehicle_s + min(self.target_velocity, self.foward_vehicle_speed) * time_offset
+                    # else :
+                    #     goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
+                    goal_s_with_offset = vehicle_s + 50 * time_offset
 
 
                     # 5차 곡선
