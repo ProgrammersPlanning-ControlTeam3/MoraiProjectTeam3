@@ -7,7 +7,7 @@ import numpy as np
 from tf.transformations import euler_from_quaternion
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry, Path
-from morai_msgs.msg import EgoVehicleStatus
+from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
 import matplotlib.pyplot as plt
 import time
 
@@ -268,6 +268,7 @@ class stanley:
         rospy.Subscriber("/lattice_path", Path, self.path_callback)
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
+        rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_callback)
 
         self.is_path = False
         self.is_odom = False
@@ -281,23 +282,23 @@ class stanley:
 
         self.target_velocity = 40  # Target Velocity in m/s
 
-        self.k = 1  # Stanley Gain
+        self.k = 0.5  # Stanley Gain
         self.k_psi = 0.5  # For heading Error
-        self.k_y = 1.5  # For CTR Error
+        self.k_y = 1.0  # For CTR Error
 
         # self.k = 1.1  # Stanley Gain
         # self.k_psi = 0.8  # For heading Error
         # self.k_y = 0.75  # For CTR Error
 
         self.max_cross_track_error = 0.4  # Maximum cross track error
-        self.alpha = 5
+        self.alpha = 8
 
         self.vehicle_length = 5.155  # Vehicle Length
 
         self.lfd = 1
         self.min_lfd = 4 
         self.max_lfd = 30 
-        self.lfd_gain = 0.8 
+        self.lfd_gain = 0.8
 
         if self.vehicle_length is None or self.lfd is None:
             print("you need to change values at line 57~58 ,  self.vegicle_length , lfd")
@@ -339,6 +340,10 @@ class stanley:
         self.global_path = msg
         self.is_global_path = True
 
+    def object_callback(self, msg):
+        self.is_obj = True
+        self.object_data = msg
+
     def get_current_waypoint(self, ego_status, global_path):
         min_dist = float('inf')
         current_waypoint = -1
@@ -352,13 +357,34 @@ class stanley:
                 current_waypoint = i
         return current_waypoint
 
+
+    def is_obstacle_nearby(self):
+        if not self.is_obj:
+            return False
+
+        for obj in self.object_data.npc_list:
+            dx = obj.position.x - self.current_position.x
+            dy = obj.position.y - self.current_position.y
+            distance = sqrt(dx**2 + dy**2)
+            if distance < 50:
+                return True
+        return False
+
     def calc_stanley_control(self):
-        if not self.is_path or not self.is_odom:
+        if not self.is_path or not self.is_odom or not self.is_status:
             return 0.0
 
         current_velocity = self.status_msg.velocity.x
+
+        if self.is_obstacle_nearby():
+            self.lfd_gain = 2.0
+        else:
+            self.lfd_gain = 0.5
+
         self.lfd = self.lfd_gain * current_velocity
+
         self.lfd = np.clip(self.lfd, self.min_lfd, self.max_lfd)
+
         print(self.lfd)
 
         lookahead_distance = self.lfd
