@@ -25,8 +25,8 @@ def degrees_to_radians(degrees):
 def map():
     # Start, goal : [x, y, theta]
     # default value == hard cording
-    start = [5.5, 1068.8048, degrees_to_radians(-35.765)]
-    goal = [5.25, 1021.73, degrees_to_radians(-120.769)]
+    # start = [5.5, 1068.8048, degrees_to_radians(-35.765)]
+    # goal = [5.25, 1021.73, degrees_to_radians(-120.769)]
 
     # Searching space : [min_x, max_x, min_y, max_y]
     space = [-18.19, 43.6, 1004.84, 1076.51]
@@ -48,7 +48,7 @@ def map():
     
     goal_data = scenario.getParkingLotGoal()
     goal_pos = goal_data['pos']
-    goal_yaw = degrees_to_radians(float(goal_data['rot']['yaw']))
+    goal_yaw = degrees_to_radians(float(goal_data['rot']['yaw'])+180)
     goal = [goal_pos['x'],goal_pos['y'],goal_yaw]
 
     objectList = scenario.getObject()
@@ -66,7 +66,7 @@ def map():
             obstacleList.append(obs)
 
         elif DataId == obstacleId['corn'] :
-            obs = obstacle.Obstacle(DataX,DataY, 1. , 2)
+            obs = obstacle.Obstacle(DataX,DataY, 0.5 , 1.8)
             obstacleList.append(obs)
 
 
