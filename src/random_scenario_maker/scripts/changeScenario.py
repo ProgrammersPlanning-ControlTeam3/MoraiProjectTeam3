@@ -15,7 +15,8 @@ def main():
         data = json.load(f)
 
     object_lists = data['objectList']
-
+    data['parkingLotStart'] = dict()
+    data['parkingLotGoal'] = dict()
     parking_lot_start = data['parkingLotStart']
     parking_lot_goal = data['parkingLotGoal']
     
@@ -34,15 +35,14 @@ def main():
         cnt += 1
         if cnt >= len(object_lists):
             cnt = 0
-    
     #fixed start point
     parking_lot_start['pos'] = {
-        "x": 64.850997924804688,
-        "y": 1851.362060546875,
+        "x": 5.5,
+        "y": 1068.8048,
         "z": -0.32499998807907104,
-        "_x": "64.851",
-        "_y": "1,851.362",
-        "_z": "-0.325"
+        "_x": "5.5",
+        "_y": "1068.8048",
+        "_z": "-0.32499998807907104"
       }
     parking_lot_start['rot'] = {
         "roll": "0.0",
@@ -54,7 +54,7 @@ def main():
     parking_lot_goal['pos'] = random_goal[0]
     parking_lot_goal['rot'] = random_goal[1]
 
-    with open('src/random_scenario_maker/scenario/random_obstacle_scenario.json', 'w') as f:
+    with open('src/random_scenario_maker/scenario/random_obstacle_scenario_for_test.json', 'w') as f:
         json.dump(data, f, indent=2)
 
     # print(random.choice(blankParkingSpace))
@@ -62,3 +62,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print("Shuffle Scenario")
