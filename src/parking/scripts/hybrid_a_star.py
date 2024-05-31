@@ -12,7 +12,7 @@ from map import map
 
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
-from lib.mgeo.class_defs import *
+# from lib.mgeo.class_defs import *
 
 show_animation  = True
 """
@@ -31,6 +31,15 @@ class Node:
         self.f = 0
         self.g = 0
         self.h = 0
+def slice_list_with_interval(lst, interval):
+    # 첫 번째 원소는 항상 포함
+    result = [lst[0]]
+    # 간격에 맞게 중간 원소들을 추가
+    result.extend(lst[i] for i in range(interval, len(lst) - 1, interval))
+    # 마지막 원소는 항상 포함
+    if len(lst) > 1:  # 리스트가 1개 이상인 경우에만 마지막 원소를 추가
+        result.append(lst[-1])
+    return result
 
 # Check if position of node is same( if distance < threshold, regard as same node)
 def isSamePosition(node_1, node_2, epsilon_position=0.8):
@@ -174,7 +183,7 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
         # print("cur node = ", cur_index, cur_node.position, cur_node.f)
 
         # If goal, return optimal path
-        if (isSamePosition(cur_node, goal_node, epsilon_position=0.6)):
+        if (isSamePosition(cur_node, goal_node, epsilon_position=0.6) and isSameYaw(cur_node,goal_node,epsilon_yaw=0.2)):
             opt_path = []
             node = cur_node
             while node is not None :
@@ -273,15 +282,23 @@ def main():
         plt.xlabel("X [m]"), plt.ylabel("Y [m]")
         # plt.title("Hybrid a star algorithm", fontsize=20)
 
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.08)
 
     print("Optimal path found!")
     len_opt_path = len(opt_path)
 
     #Dubins
     dubins = Dubins()
-    kappa_ = .25/2.0
+    kappa_ = 1./2.0
+    
     dubins_base = [opt_path[0],opt_path[int(0.3*len_opt_path)],opt_path[int(0.6*len_opt_path)],opt_path[-1]]
+    
+    dubins_base = [opt_path[0],opt_path[int(0.2*len_opt_path)],opt_path[int(0.5*len_opt_path)],
+                   opt_path[int(0.8*len_opt_path)],opt_path[-1]]
+    
+    #dubins_base = [opt_path[0],opt_path[8],opt_path[-8],opt_path[-1]]
+    # dubins_base = opt_path
+    dubins_base = slice_list_with_interval(opt_path,6)
     dubins_global_path = []
     
     #포인트 간의 dubins path 를 추출해줌
@@ -289,8 +306,6 @@ def main():
         cartesian_path, _, _ = dubins.plan(dubins_base[i], dubins_base[i+1], kappa_)
         path_x, path_y, path_yaw = cartesian_path
         plt.plot(path_x, path_y, 'g-')
-        
-    print(path_x)
 
 
     opt_path = np.array(opt_path)
@@ -301,13 +316,13 @@ def main():
 def get_hybrid_a_star_dubins_global_path():
 
     start, goal, obstacle_list, space = map()
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=0.5)
     print("Optimal path found!")
     len_opt_path = len(opt_path)
 
     #Dubins
     dubins = Dubins()
-    kappa_ = .25/2.0
+    kappa_ = .5/2.0
     dubins_base = [opt_path[0],opt_path[int(0.3*len_opt_path)],opt_path[int(0.6*len_opt_path)],opt_path[-1]]
     dubins_global_path = []
     dubins_x = []
