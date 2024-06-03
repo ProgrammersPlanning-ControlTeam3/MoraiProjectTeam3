@@ -11,7 +11,7 @@ from nav_msgs.msg import Path
 from std_msgs.msg import Int32
 
 import numpy as np
-from frame_transform import *   
+from frame_transform import *
 
 class latticePlanner:
     def __init__(self):
@@ -24,8 +24,6 @@ class latticePlanner:
         rospy.Subscriber('/Object_topic/tracked_object_pose_topic', TrackedObjectPoseList, self.object_info_callback)
         rospy.Subscriber('/Object_topic/tracked_object_path_topic', PredictedObjectPathList, self.object_path_callback)
         rospy.Subscriber('/Object_topic/deleted_object_id', Int32, self.deleted_object_callback)
-        rospy.Subscriber("/lattice_path", Path, self.lattice_path_callback)
-
 
         self.lattice_path_pub = rospy.Publisher('/lattice_path', Path, queue_size=1)
 
@@ -37,7 +35,6 @@ class latticePlanner:
         self.is_path_received = False
         self.object_path = None
         self.deleted_ids = set()
-        self.is_lattice_path = False
 
         self.foward_vehicle_speed = 0
         self.target_velocity = 40  # Target Velocity in m/s
@@ -46,27 +43,19 @@ class latticePlanner:
         rate = rospy.Rate(30)  # 30hz
         while not rospy.is_shutdown():
             if self.is_path and self.is_status and self.is_obj:
-                
-                if self.is_lattice_path == False:
-                    self.lattice_path_pub.publish(self.local_path)
-                
+                if self.checkObject(self.local_path, self.object_data, self.object_path):
+
+                    self.foward_vehicle_speed = self.get_forward_vehicle(self.local_path, self.object_data)
+
+                    lattice_path = self.latticePlanner(self.local_path, self.status_msg)
+
+                    lattice_path_index = self.collision_check(self.object_data, lattice_path)
+
+                    # (7)  lattice 경로 메세지 Publish
+                    self.lattice_path_pub.publish(lattice_path[lattice_path_index])
+
                 else:
-                    if self.checkObject_npc(self.subscribed_lattice_path, self.object_data):
-                        if self.checkObject_npc_path(self.subscribed_lattice_path, self.object_path):
-                            self.lattice_path_pub.publish(self.subscribed_lattice_path)
-                        else:
-                            self.foward_vehicle_speed = self.get_forward_vehicle(self.subscribed_lattice_path, self.object_data)
-                            lattice_path = self.latticePlanner(self.subscribed_lattice_path, self.status_msg)
-                            lattice_path_index = self.collision_check(self.object_data, lattice_path)
-
-                            # (7)  lattice 경로 메세지 Publish
-                            self.lattice_path_pub.publish(lattice_path[lattice_path_index])
-                            print("Y")
-
-                    else:
-                        self.lattice_path_pub.publish(self.local_path)
-                        print("N")
-                
+                    self.lattice_path_pub.publish(self.local_path)
             rate.sleep()
 
 
@@ -90,7 +79,7 @@ class latticePlanner:
         for local_pose in local_path:
             for npc in object_data.npc_list:
                 local_npc_position = self.transform_to_local(npc.position, forward_vehicle, forward_theta)
-                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1.75:
+                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1:
                     # print("Vehicle ahead : ", local_npc_position.x - local_pose.x)
                     # print(npc.velocity.x)
                     return npc.velocity.x
@@ -98,10 +87,13 @@ class latticePlanner:
         return None
 
 
-    def checkObject_npc(self, ref_path, object_data):
-        
+    def checkObject(self, ref_path, object_data, object_path):
         def is_collision_distance(path_pose, obj_position, threshold):
             dis = sqrt(pow(path_pose.x - obj_position.x, 2) + pow(path_pose.y - obj_position.y, 2))
+            return dis < threshold
+
+        def is_path_overlap(path_pose, predicted_pose, threshold):
+            dis = sqrt(pow(path_pose.x - predicted_pose.x, 2) + pow(path_pose.y - predicted_pose.y, 2))
             return dis < threshold
 
         vehicle_position = ref_path.poses[0].pose.position
@@ -118,20 +110,6 @@ class latticePlanner:
                     print("NPC")
                     return True
 
-        return False
-    
-    def checkObject_npc_path(self, ref_path, object_path):
-        
-        def is_path_overlap(path_pose, predicted_pose, threshold):
-            dis = sqrt(pow(path_pose.x - predicted_pose.x, 2) + pow(path_pose.y - predicted_pose.y, 2))
-            return dis < threshold
-
-        vehicle_position = ref_path.poses[0].pose.position
-        theta = atan2(ref_path.poses[1].pose.position.y - vehicle_position.y,
-                      ref_path.poses[1].pose.position.x - vehicle_position.x)
-
-        local_path = [self.transform_to_local(pose.pose.position, vehicle_position, theta) for pose in ref_path.poses]
-
         # npc's predicted path
         if object_path is not None:
             for local_pose in local_path:
@@ -141,7 +119,7 @@ class latticePlanner:
                         if is_path_overlap(local_pose, local_predicted_position, 2.35):
                             print("Path")
                             return True
-        return False    
+        return False
 
 
     # TODO 현재 : npc와의 거리, npc의 예측 경로와의 거리가 일정 이하릴 때 충돌로 판단
@@ -255,10 +233,6 @@ class latticePlanner:
 
     def deleted_object_callback(self, msg):
         self.deleted_ids.add(msg.data)
-    
-    def lattice_path_callback(self, msg):
-        self.is_lattice_path = True
-        self.subscribed_lattice_path = msg
 
     def generate_5th_order_polynomial(self, ys, yf, xs, xf):
         # 5차 곡선 계수 계산
