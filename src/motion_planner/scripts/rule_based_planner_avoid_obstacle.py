@@ -27,6 +27,7 @@ from control.scripts.lateral_controller import stanley
 # from control.scripts.lateral_controller import pure_pursuit
 from control.scripts.longitudinal_controller import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
+from control.scripts.longitudinal_follow_vehicle import FollowVehicle
 
 class rule_based_planner:
     def __init__(self):
@@ -65,6 +66,7 @@ class rule_based_planner:
         self.pid = pidControl() # PID Control
         self.vel_planning = velocityPlanning(self.target_velocity / 3.6, 0.15) # Velocity Control
         self.stanley = stanley() 
+        self.follow_vehicle = FollowVehicle()
         # self.pure_pursuit = pure_pursuit() # Pure Pursuit control
         # self.object_detector = object_detector() # Object Detection to avoid
 
@@ -88,6 +90,9 @@ class rule_based_planner:
 
                 self.target_velocity = self.velocity_list[self.current_waypoint] * 3.6
 
+                ## TODO target_velocity -> 감속 (앞 차량이 있거나, 예측 경로와 겹칠 경우)
+                self.re_target_velocity = self.follow_vehicle.control_velocity(self.target_velocity)
+                
                 steering = self.stanley.calc_stanley_control()
                 # steering = self.pure_pursuit.calc_pure_pursuit()
 
@@ -97,7 +102,7 @@ class rule_based_planner:
                 else:
                     self.ctrl_cmd_msg.steering = steering #0.0 last
 
-                output = self.pid.pid(self.target_velocity, self.status_msg.velocity.x * 3.6)
+                output = self.pid.pid(self.re_target_velocity, self.status_msg.velocity.x * 3.6)
 
                 # nearest_dis, heading_difference = self.object_detector.nearest_cost()
 
