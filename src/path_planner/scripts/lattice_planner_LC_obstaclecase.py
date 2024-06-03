@@ -7,7 +7,7 @@ from math import cos, sin, pi, sqrt, pow, atan2
 from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
 from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList
 from geometry_msgs.msg import Point, PoseStamped, Point32
-from nav_msgs.msg import Path, Odometry
+from nav_msgs.msg import Path
 from std_msgs.msg import Int32
 
 import numpy as np
@@ -20,12 +20,12 @@ class latticePlanner:
         # (1) subscriber, publisher 선언
         rospy.Subscriber("/local_path", Path, self.path_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
-        rospy.Subscriber("/odom", Odometry, self.odom_callback)
-
         rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_callback)
         rospy.Subscriber('/Object_topic/tracked_object_pose_topic', TrackedObjectPoseList, self.object_info_callback)
         rospy.Subscriber('/Object_topic/tracked_object_path_topic', PredictedObjectPathList, self.object_path_callback)
         rospy.Subscriber('/Object_topic/deleted_object_id', Int32, self.deleted_object_callback)
+        rospy.Subscriber("/lattice_path", Path, self.lattice_path_callback)
+
 
         self.lattice_path_pub = rospy.Publisher('/lattice_path', Path, queue_size=1)
 
@@ -37,6 +37,7 @@ class latticePlanner:
         self.is_path_received = False
         self.object_path = None
         self.deleted_ids = set()
+        self.is_lattice_path = False
 
         self.foward_vehicle_speed = 0
         self.target_velocity = 40  # Target Velocity in m/s
@@ -46,13 +47,27 @@ class latticePlanner:
         while not rospy.is_shutdown():
             if self.is_path and self.is_status and self.is_obj:
                 
-                self.foward_vehicle_speed = self.get_forward_vehicle(self.local_path, self.object_data)
-                lattice_path = self.latticePlanner(self.local_path, self.x, self.y)
-                lattice_path_index = self.collision_check(self.object_data, self.object_path, lattice_path)
+                if self.is_lattice_path == False:
+                    self.lattice_path_pub.publish(self.local_path)
+                
+                else:
+                    if self.checkObject_npc(self.subscribed_lattice_path, self.object_data):
+                        # TODO : check except forward vehicle...
+                        if self.checkObject_npc_path(self.subscribed_lattice_path, self.object_path):
+                            self.lattice_path_pub.publish(self.subscribed_lattice_path)
+                            print("LK")
+                        else:
+                            self.foward_vehicle_speed = self.get_forward_vehicle(self.subscribed_lattice_path, self.object_data)
+                            lattice_path = self.latticePlanner(self.subscribed_lattice_path, self.status_msg)
+                            lattice_path_index = self.collision_check(self.object_data, lattice_path)
 
-                # (7)  lattice 경로 메세지 Publish
-                self.lattice_path_pub.publish(lattice_path[lattice_path_index])
+                            # (7)  lattice 경로 메세지 Publish
+                            self.lattice_path_pub.publish(lattice_path[lattice_path_index])
+                            print("LC")
 
+                    else:
+                        self.lattice_path_pub.publish(self.local_path)
+                
             rate.sleep()
 
 
@@ -76,9 +91,10 @@ class latticePlanner:
         for local_pose in local_path:
             for npc in object_data.npc_list:
                 local_npc_position = self.transform_to_local(npc.position, forward_vehicle, forward_theta)
-                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1.75:
+                if 0 < (local_npc_position.x - local_pose.x) < 50 and abs(local_npc_position.y - local_pose.y) < 1.75:
                     # print("Vehicle ahead : ", local_npc_position.x - local_pose.x)
                     # print(npc.velocity.x)
+                    # print(npc.unique_id)
                     return npc.velocity.x
 
         return None
@@ -100,131 +116,140 @@ class latticePlanner:
         for local_pose in local_path:
             for npc in object_data.npc_list:
                 local_npc_position = self.transform_to_local(npc.position, vehicle_position, theta)
-                if is_collision_distance(local_pose, local_npc_position, 2.35):
-                    print("NPC")
+                if is_collision_distance(local_pose, local_npc_position, 5):
+                    # print("NPC")
                     return True
 
         return False
-    
+
+
     def checkObject_npc_path(self, ref_path, object_path):
-        
         def is_path_overlap(path_pose, predicted_pose, threshold):
             dis = sqrt(pow(path_pose.x - predicted_pose.x, 2) + pow(path_pose.y - predicted_pose.y, 2))
             return dis < threshold
 
         vehicle_position = ref_path.poses[0].pose.position
         theta = atan2(ref_path.poses[1].pose.position.y - vehicle_position.y,
-                      ref_path.poses[1].pose.position.x - vehicle_position.x)
+                    ref_path.poses[1].pose.position.x - vehicle_position.x)
 
         local_path = [self.transform_to_local(pose.pose.position, vehicle_position, theta) for pose in ref_path.poses]
+
+        forward_vehicle_id = self.get_forward_vehicle_id(ref_path, self.object_data)
 
         # npc's predicted path
         if object_path is not None:
             for local_pose in local_path:
                 for predicted_path in object_path.path_list:
+                    if predicted_path.unique_id == forward_vehicle_id:
+                        continue  # Skip forward vehicle's predicted path
                     for predicted_pose in predicted_path.path:
                         local_predicted_position = self.transform_to_local(Point(x=predicted_pose.x, y=predicted_pose.y, z=0), vehicle_position, theta)
-                        if is_path_overlap(local_pose, local_predicted_position, 2.35):
-                            print("Path")
+                        if is_path_overlap(local_pose, local_predicted_position, 5):
+                            # print("Path")
                             return True
-        return False    
+        return False
 
 
     def get_forward_vehicle_id(self, ref_path, object_data):
-        vehicle_position = ref_path.poses[0].pose.position
-        theta = atan2(ref_path.poses[1].pose.position.y - vehicle_position.y,
-                    ref_path.poses[1].pose.position.x - vehicle_position.x)
+        forward_vehicle = ref_path.poses[0].pose.position
+        forward_theta = atan2(ref_path.poses[1].pose.position.y - forward_vehicle.y,
+                            ref_path.poses[1].pose.position.x - forward_vehicle.x)
 
-        local_path = [self.transform_to_local(pose.pose.position, vehicle_position, theta) for pose in ref_path.poses]
+        local_path = [self.transform_to_local(pose.pose.position, forward_vehicle, forward_theta) for pose in ref_path.poses]
 
         for local_pose in local_path:
             for npc in object_data.npc_list:
-                local_npc_position = self.transform_to_local(npc.position, vehicle_position, theta)
-                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1.75:
+                local_npc_position = self.transform_to_local(npc.position, forward_vehicle, forward_theta)
+                if 0 < (local_npc_position.x - local_pose.x) < 50 and abs(local_npc_position.y - local_pose.y) < 1.75:
                     return npc.unique_id
+
         return None
 
-    def collision_check(self, object_data, object_path, out_path):
-        # 생성된 충돌 회피 경로 중 낮은 비용의 경로 선택
 
+    def collision_check(self, object_data, out_path):
+
+        def cost_function(dist, i):
+            cost = -(dist - i)**2 + 20
+            return cost
+
+        # TODO: (6) 생성된 충돌회피 경로 중 낮은 비용의 경로 선택
         selected_lane = -1
-        lane_weight = [30, 5, 0, 100, 30, 5, 0, 100]  # reference path
-
-        path_size = 50
-
-        # path_size = self.foward_vehicle_speed
-        # if self.foward_vehicle_speed is None:
-        #     path_size = self.local_path_size
-
-        short_path_size = path_size * 0.6
-
-        def is_path_overlap(path_pose, predicted_pose, threshold):
-            dis = sqrt(pow(path_pose.pose.position.x - predicted_pose.x, 2) + pow(path_pose.pose.position.y - predicted_pose.y, 2))
-            return dis < threshold
-
-        forward_vehicle_id = self.get_forward_vehicle_id(self.local_path, object_data)
+        lane_weight = [3,2,1,3,2,1]
 
         for obstacle in object_data.npc_list:
             for path_num in range(len(out_path)):
                 for path_pos in out_path[path_num].poses:
+
                     dis = sqrt(
-                        pow(obstacle.position.x - path_pos.pose.position.x, 2) + pow(obstacle.position.y - path_pos.pose.position.y, 2))
+                        pow(obstacle.position.x - path_pos.pose.position.x, 2) +
+                        pow(obstacle.position.y - path_pos.pose.position.y, 2)
+                    )
 
-                    # weight based on distance
-                    if dis < short_path_size:
-                        if path_num < 4:
-                            if dis < 10:
-                                weight_increase = 20
-                            elif dis < 25:
-                                weight_increase = 10
-                            elif dis < 40:
-                                weight_increase = 5
-                            else:
-                                weight_increase = 0
-                            lane_weight[path_num] += weight_increase
-                        else:
-                            lane_weight[path_num] += 30
-
+                    if dis < 4:
+                        centre = 0
+                    elif dis < 8:
+                        centre = 1
+                    elif dis < 12:
+                        centre = 2
+                    elif dis < 16:
+                        centre = 3
+                    elif dis < 20:
+                        centre = 4
                     else:
-                        if path_num < 4:
-                            lane_weight[path_num] += 30
-                        else:
-                            if dis < 10:
-                                weight_increase = 20
-                            elif dis < 25:
-                                weight_increase = 10
-                            elif dis < 40:
-                                weight_increase = 5
-                            else:
-                                weight_increase = 0
-                            lane_weight[path_num] += weight_increase
+                        centre = 5
 
-                    # NPC의 예측 경로와 local path 검사
-                    if object_path is not None:
-                        for predicted_path in object_path.path_list:
-                            if predicted_path.unique_id == forward_vehicle_id:
-                                continue  # Skip forward vehicle's predicted path
-                            for predicted_pose in predicted_path.path:
-                                if is_path_overlap(path_pos, predicted_pose, 2.35):
-                                    if path_num < 4:
-                                        lane_weight[path_num] += 30
-                                    else:
-                                        lane_weight[path_num] += 20
+                    lane_weight[path_num] += cost_function(centre, path_num)
 
-        selected_lane = lane_weight.index(min(lane_weight))
-        print("Lane change : ", selected_lane)
-        print("0 : ", lane_weight[0])
-        print("1 : ", lane_weight[1])
-        print("2 : ", lane_weight[2])
-        print("3 : ", lane_weight[3])
-        print("4 : ", lane_weight[4])
-        print("5 : ", lane_weight[5])
-        print("6 : ", lane_weight[6])
-        print("7 : ", lane_weight[7])
-        print("\n")
+
+        selected_lane = lane_weight.index(max(lane_weight))
+        # print("Lane change : ", selected_lane)
+
         return selected_lane
 
 
+
+    # def collision_check(self, object_data, out_path):
+    #     # TODO: (6) 생성된 충돌회피 경로 중 낮은 비용의 경로 선택
+    #     selected_lane = -1
+    #     lane_weight = [11, 12, 13, 1, 2, 3]
+
+
+    #     # path_size = self.foward_vehicle_speed
+    #     path_size = 50
+
+    #     # if self.foward_vehicle_speed is None:
+    #     #     path_size = self.local_path_size
+
+    #     short_path_size = path_size * 0.6
+
+    #     for obstacle in object_data.npc_list:
+    #         for path_num in range(len(out_path)):
+    #             for path_pos in out_path[path_num].poses:
+    #                 dis = sqrt(
+    #                     pow(obstacle.position.x - path_pos.pose.position.x, 2) + pow(obstacle.position.y - path_pos.pose.position.y, 2))
+
+    #                 # apply weight to all paths
+    #                 if dis < short_path_size:
+    #                     if path_num < 3:
+    #                         weight_increase = 10
+    #                     else:
+    #                         weight_increase = 30
+    #                 # weight to 3, 4, 5 paths only
+    #                 elif short_path_size <= dis < path_size:
+    #                     if path_num < 3:
+    #                         weight_increase = 30
+    #                     else:
+    #                         weight_increase = 0
+    #                 else:
+    #                     weight_increase = 0
+
+    #                 lane_weight[path_num] += weight_increase
+
+
+    #     selected_lane = lane_weight.index(min(lane_weight))
+    #     print("Lane change : ", selected_lane)
+
+    #     return selected_lane
 
     def path_callback(self, msg):
         self.is_path = True
@@ -233,12 +258,6 @@ class latticePlanner:
     def status_callback(self, msg):  ## Vehicle Status Subscriber
         self.is_status = True
         self.status_msg = msg
-
-    def odom_callback(self, msg):
-        self.is_status=True
-        self.x = msg.pose.pose.position.x
-        self.y = msg.pose.pose.position.y
-
 
     def object_callback(self, msg):
         self.is_obj = True
@@ -254,7 +273,10 @@ class latticePlanner:
 
     def deleted_object_callback(self, msg):
         self.deleted_ids.add(msg.data)
-
+    
+    def lattice_path_callback(self, msg):
+        self.is_lattice_path = True
+        self.subscribed_lattice_path = msg
 
     def generate_5th_order_polynomial(self, ys, yf, xs, xf):
         # 5차 곡선 계수 계산
@@ -271,11 +293,11 @@ class latticePlanner:
     def calculate_polynomial(self, a, x_vals):
         return a[0] + a[1] * x_vals + a[2] * x_vals**2 + a[3] * x_vals**3 + a[4] * x_vals**4 + a[5] * x_vals**5
 
-    def latticePlanner(self, ref_path, x, y):
+    def latticePlanner(self, ref_path, vehicle_status):
         out_path = []
-        vehicle_pose_x = x
-        vehicle_pose_y = y
-        vehicle_velocity = self.status_msg.velocity.x * 3.6
+        vehicle_pose_x = vehicle_status.position.x
+        vehicle_pose_y = vehicle_status.position.y
+        vehicle_velocity = vehicle_status.velocity.x * 3.6
 
         look_distance = int(vehicle_velocity * 0.2 * 2)
 
@@ -300,24 +322,23 @@ class latticePlanner:
             vehicle_s, vehicle_d = get_frenet(vehicle_pose_x, vehicle_pose_y, mapx, mapy)
 
             goal_s, goal_d = get_frenet(global_ref_end_point[0], global_ref_end_point[1], mapx, mapy)
-
-            lane_offsets = [4, 3.5, 0, -3.5]
+            lane_offsets = [5, 4.25, 3.5]
             time_offsets = [0.6, 1.0]
 
             for time_offset in time_offsets:
                 for lane_offset in lane_offsets:
                     lattice_path = Path()
                     lattice_path.header.frame_id = 'map'
-                    goal_d_with_offset = vehicle_d + lane_offset
+                    goal_d_with_offset = vehicle_d + lane_offset 
 
                     # forward vehicle's speed based target point
-                    # if self.foward_vehicle_speed is not None:
-                    #     goal_s_with_offset = vehicle_s + min(self.target_velocity, self.foward_vehicle_speed) * time_offset
-                    # else :
-                    #     goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
-
+                    if self.foward_vehicle_speed is not None:
+                        goal_s_with_offset = vehicle_s + min(self.target_velocity, self.foward_vehicle_speed) * time_offset
+                    else :
+                        goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
+                    
                     # Test용 코드
-                    goal_s_with_offset = vehicle_s + 50 * time_offset
+                    # goal_s_with_offset = vehicle_s + 50 * time_offset
 
 
                     # 5차 곡선
