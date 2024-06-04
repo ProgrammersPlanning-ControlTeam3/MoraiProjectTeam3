@@ -148,13 +148,13 @@ class latticePlanner:
         # 생성된 충돌 회피 경로 중 낮은 비용의 경로 선택
 
         selected_lane = -1
-        lane_weight = [30, 5, 0, 100, 30, 5, 0, 100]  # reference path
+        lane_weight = [15, 3, 0, 500, 15, 3, 0, 500]  # reference path
 
-        path_size = 50
+        # path_size = 50
 
-        # path_size = self.foward_vehicle_speed
-        # if self.foward_vehicle_speed is None:
-        #     path_size = self.local_path_size
+        path_size = self.foward_vehicle_speed
+        if self.foward_vehicle_speed is None:
+            path_size = self.local_path_size
 
         short_path_size = path_size * 0.6
 
@@ -207,21 +207,21 @@ class latticePlanner:
                             for predicted_pose in predicted_path.path:
                                 if is_path_overlap(path_pos, predicted_pose, 2.35):
                                     if path_num < 4:
-                                        lane_weight[path_num] += 30
+                                        lane_weight[path_num] += 15
                                     else:
-                                        lane_weight[path_num] += 20
+                                        lane_weight[path_num] += 10
 
         selected_lane = lane_weight.index(min(lane_weight))
-        print("Lane change : ", selected_lane)
-        print("0 : ", lane_weight[0])
-        print("1 : ", lane_weight[1])
-        print("2 : ", lane_weight[2])
-        print("3 : ", lane_weight[3])
-        print("4 : ", lane_weight[4])
-        print("5 : ", lane_weight[5])
-        print("6 : ", lane_weight[6])
-        print("7 : ", lane_weight[7])
-        print("\n")
+        # print("Lane change : ", selected_lane)
+        # print("0 : ", lane_weight[0])
+        # print("1 : ", lane_weight[1])
+        # print("2 : ", lane_weight[2])
+        # print("3 : ", lane_weight[3])
+        # print("4 : ", lane_weight[4])
+        # print("5 : ", lane_weight[5])
+        # print("6 : ", lane_weight[6])
+        # print("7 : ", lane_weight[7])
+        # print("\n")
         return selected_lane
 
 
@@ -311,13 +311,13 @@ class latticePlanner:
                     goal_d_with_offset = vehicle_d + lane_offset
 
                     # forward vehicle's speed based target point
-                    # if self.foward_vehicle_speed is not None:
-                    #     goal_s_with_offset = vehicle_s + min(self.target_velocity, self.foward_vehicle_speed) * time_offset
-                    # else :
-                    #     goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
+                    if self.foward_vehicle_speed is not None:
+                        goal_s_with_offset = vehicle_s + min(self.target_velocity, self.foward_vehicle_speed) * time_offset
+                    else :
+                        goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
 
                     # Test용 코드
-                    goal_s_with_offset = vehicle_s + 50 * time_offset
+                    # goal_s_with_offset = vehicle_s + 50 * time_offset
 
 
                     # 5차 곡선
