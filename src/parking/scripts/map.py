@@ -43,12 +43,12 @@ def map():
     scenario = ScenarioLoader()
     start_data = scenario.getParkingLotStart()
     start_pos = start_data['pos']
-    start_yaw = degrees_to_radians(float(start_data['rot']['yaw']))
+    start_yaw = degrees_to_radians(float(start_data['rot']['yaw'])+360)
     start = [start_pos['x'],start_pos['y'],start_yaw]
-    
+
     goal_data = scenario.getParkingLotGoal()
     goal_pos = goal_data['pos']
-    goal_yaw = degrees_to_radians(float(goal_data['rot']['yaw'])+180)
+    goal_yaw = degrees_to_radians(float(goal_data['rot']['yaw'])+360)
     goal = [goal_pos['x'],goal_pos['y'],goal_yaw]
 
     objectList = scenario.getObject()
