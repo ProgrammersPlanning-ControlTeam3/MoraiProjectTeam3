@@ -45,7 +45,6 @@ class latticePlanner:
                 # print(dis)
                 if dis < 2.35: # 장애물의 좌표값이 지역 경로 상의 좌표값과의 직선거리가 2.35 미만일때 충돌이라 판단.
                     is_crash = True
-                    print("crash!")
                     break
 
         return is_crash
@@ -54,7 +53,7 @@ class latticePlanner:
         #TODO: (6) 생성된 충돌회피 경로 중 낮은 비용의 경로 선택
         
         selected_lane = -1        
-        lane_weight = [3, 2, 1, 1, 2, 3] #reference path 
+        lane_weight = [300, 200, 100, 1, 2, 3] #reference path 
 
         for obstacle in object_data.npc_list:
             for path_num in range(len(out_path)) :
@@ -66,19 +65,20 @@ class latticePlanner:
                         
                     # weight based on distance 
                     if dis < 10:
-                        weight_increase = 200
+                        weight_increase = 20
                     elif dis < 25:
-                        weight_increase = 100
+                        weight_increase = 10
                     elif dis < 40:
-                        weight_increase = 50
+                        weight_increase = 5
                     else:
                         weight_increase = 0
                     lane_weight[path_num] += weight_increase
                     
-        selected_lane = lane_weight.index(min(lane_weight))     
+        selected_lane = lane_weight.index(min(lane_weight))
+        print("Lane change : ", selected_lane)
 
         return selected_lane
-
+    
     def path_callback(self,msg):
         self.is_path = True
         self.local_path = msg  
@@ -100,8 +100,8 @@ class latticePlanner:
         look_distance = int(vehicle_velocity * 0.2 * 2)
 
         
-        if look_distance < 20 :
-            look_distance = 20                    
+        if look_distance < 40 :
+            look_distance = 40                    
 
         if len(ref_path.poses) > look_distance :  
             #TODO: (3) 좌표 변환 행렬 생성
@@ -131,7 +131,7 @@ class latticePlanner:
             local_end_point = det_trans_matrix.dot(world_end_point)
             world_ego_vehicle_position = np.array([[vehicle_pose_x], [vehicle_pose_y], [1]])
             local_ego_vehicle_position = det_trans_matrix.dot(world_ego_vehicle_position)
-            lane_off_set = [-3.0, -1.75, -1, 1, 1.75, 3.0]            
+            lane_off_set = [-6, -3, -1.5, 1.5, 3, 6]            
             local_lattice_points = []
             
             for i in range(len(lane_off_set)):

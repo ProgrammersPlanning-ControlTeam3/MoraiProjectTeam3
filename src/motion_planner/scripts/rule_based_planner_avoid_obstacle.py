@@ -23,9 +23,11 @@ sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 #print(sys.path)
 
 from control.scripts.pid_controller import pidControl
-from control.scripts.lateral_controller import pure_pursuit
+from control.scripts.lateral_controller import stanley
+# from control.scripts.lateral_controller import pure_pursuit
 from control.scripts.longitudinal_controller import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
+from control.scripts.longitudinal_follow_vehicle import FollowVehicle
 
 class rule_based_planner:
     def __init__(self):
@@ -63,7 +65,9 @@ class rule_based_planner:
         # 제어 시스템 및 알고리즘 초기화 부분
         self.pid = pidControl() # PID Control
         self.vel_planning = velocityPlanning(self.target_velocity / 3.6, 0.15) # Velocity Control
-        self.pure_pursuit = pure_pursuit() # Pure Pursuit control
+        self.stanley = stanley() 
+        self.follow_vehicle = FollowVehicle()
+        # self.pure_pursuit = pure_pursuit() # Pure Pursuit control
         # self.object_detector = object_detector() # Object Detection to avoid
 
         # 무한 루프: self.is_global_path가 True로 설정될때까지 계속 실행.
@@ -81,194 +85,35 @@ class rule_based_planner:
             if self.is_path == True and self.is_odom == True and self.is_status == True: # Everything is OK
                 prev_time = time.time()
 
-                self.current_waypoint = self.pure_pursuit.get_current_waypoint(self.status_msg, self.global_path)
+                self.current_waypoint = self.stanley.get_current_waypoint(self.status_msg, self.global_path)
+                # self.current_waypoint = self.pure_pursuit.get_current_waypoint(self.status_msg, self.global_path)
+
                 self.target_velocity = self.velocity_list[self.current_waypoint] * 3.6
 
-                steering = self.pure_pursuit.calc_pure_pursuit()
+                ## TODO target_velocity -> 감속 (앞 차량이 있거나, 예측 경로와 겹칠 경우)
+                self.re_target_velocity = self.follow_vehicle.control_velocity(self.target_velocity)
 
-                if self.is_look_forward_point:
-                    self.ctrl_cmd_msg.steering = steering
+                # steering = self.stanley.calc_stanley_control()
+                # steering = self.pure_pursuit.calc_pure_pursuit()
+                # TODO tollgate area : No lattice path. Follow local path. Need to make follow local path method in stanley class
+                # steering = self.stanley.calc_stanley_control_local()
+
+                if (self.status_msg.position.y < 1300):
+                    steering = self.stanley.calc_stanley_control_local()
                 else:
-                    self.ctrl_cmd_msg.steering = steering #0.0 last
+                    steering = self.stanley.calc_stanley_control()
 
-                output = self.pid.pid(self.target_velocity, self.status_msg.velocity.x * 3.6)
+                self.ctrl_cmd_msg.steering = steering #0.0 last
 
-                # nearest_dis, heading_difference = self.object_detector.nearest_cost()
+                output = self.pid.pid(self.re_target_velocity, self.status_msg.velocity.x * 3.6)
 
-                if (self.status_msg.position.x > 160.0 and self.status_msg.position.x < 230.0 
-                     and self.status_msg.position.y > 1020.0 and self.status_msg.position.y <1780.0 ): 
-                    #rospy.loginfo('case 2')
-
-                    # same heading degree
-                    # if heading_difference > 1.0:
-                    #     if nearest_dis < 25.0:
-                    #         self.ctrl_cmd_msg.accel = 0.0
-                    #         self.ctrl_cmd_msg.brake = 1.0
-
-                    #         rospy.loginfo('#############brake##############')
-
-
-                    
-                        if output > 0.0:
-                            self.ctrl_cmd_msg.accel = output
-                            self.ctrl_cmd_msg.brake = 0.0
-                                # brake tunning
-                        elif -5.0 < output <= 0.0:
-                            self.ctrl_cmd_msg.accel = 0.0
-                            self.ctrl_cmd_msg.brake = 0.0
-
-                        else:
-                            self.ctrl_cmd_msg.accel = 0.0
-                            self.ctrl_cmd_msg.brake = -output
-                    # else:
-                        #rospy.loginfo("output' %s", output)
-
-
-                        if output > 0.0:
-                            self.ctrl_cmd_msg.accel = output
-                            self.ctrl_cmd_msg.brake = 0.0
-
-                        # morive brake tunning
-                        elif -5.0 < output <= 0.0:
-                            self.ctrl_cmd_msg.accel = 0.0
-                            self.ctrl_cmd_msg.brake = 0.0
-
-                        else:
-                            self.ctrl_cmd_msg.accel = 0.0
-                            self.ctrl_cmd_msg.brake = -output
-
-                #circle
-                elif (self.status_msg.position.x > -28.0 and self.status_msg.position.x < -17.0
-                    and self.status_msg.position.y > 980.0 and self.status_msg.position.y < 1030.0):
-
-
-                    #rospy.loginfo('case 3')
-                    if (self.status_msg.position.x > -25.0 and self.status_msg.position.x < -22.0 
-                       and self.status_msg.position.y > 1006.0 and self.status_msg.position.y < 1010.0) and self.is_go == False :
-                        for i in range(90) :
-                                self.ctrl_cmd_msg.accel = 0.0
-                                self.ctrl_cmd_msg.brake = 1.0
-                                self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
-                                rate.sleep()
-                        self.is_go = True
-
-                    # if nearest_dis > 28.0 and nearest_dis < 81.0:
-                    #     if self.status_msg.heading > 95:
-                    #         self.ctrl_cmd_msg.accel = 0.0
-                    #         self.ctrl_cmd_msg.brake = 1.0
-
-                    #         rospy.loginfo('#############brake##############')
-
-                    else:
-                        if output > 0.0:
-                            self.ctrl_cmd_msg.accel = output/40.0
-                            self.ctrl_cmd_msg.brake = 0.0
-
-                        else:
-                            self.ctrl_cmd_msg.accel = 0.0
-                            self.ctrl_cmd_msg.brake = -output
-                #before circle
-                elif (self.status_msg.position.x > -17.0 and self.status_msg.position.x < 40.0
-                    and self.status_msg.position.y > 950.0 and self.status_msg.position.y <1020.0):
-
-                    if output > 0.0:
-                        self.ctrl_cmd_msg.accel = output/self.time
-                        self.ctrl_cmd_msg.brake = 0.0
-                        self.time += 0.3
-                        if self.time > 50:
-                            self.time = 50
-
-                    else:
-                        self.ctrl_cmd_msg.accel = 0.0
-                        self.ctrl_cmd_msg.brake = -output
-
-                #before parking
-                elif (self.status_msg.position.x > -24.0 and self.status_msg.position.x < 4.0
-                    and self.status_msg.position.y > 1024.3 and self.status_msg.position.y <1075.0):
-
-                    if output > 0.0:
-                        self.ctrl_cmd_msg.accel = output/50.0
-                        self.ctrl_cmd_msg.brake = 0.0
-
-                    else:
-                        self.ctrl_cmd_msg.accel = 0.0
-                        self.ctrl_cmd_msg.brake = -output
-
-                #parking
-                elif (self.status_msg.position.x > 4.7 and self.status_msg.position.x < 5.7
-                    and self.status_msg.position.y > 1023.7 and self.status_msg.position.y < 1024.7):
-
-                    rospy.loginfo('parking.......')
-
-                    # stop
-                    start = time.time()
-                    while True:
-                        response = self.call_service(2)
-                        self.ctrl_cmd_msg.accel = 0.0
-                        self.ctrl_cmd_msg.brake = 1.0
-                        self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
-                        if (time.time() - start > 2):
-                            break
-
-                    # R (REVERSE)
-                    rospy.loginfo("drive in reverse....")
-                    while True:
-                        self.ctrl_cmd_msg.steering = -0.555
-                        self.ctrl_cmd_msg.accel = 0.2
-                        self.ctrl_cmd_msg.brake = 0.0
-                        self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
-                        if (time.time() - start > 9):
-                            break
-                    while True:
-                        self.ctrl_cmd_msg.steering = 0.0
-                        self.ctrl_cmd_msg.accel = 0.2
-                        self.ctrl_cmd_msg.brake = 0.0
-                        self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
-                        if (time.time() - start > 11.5):
-                            break
-
-                    # p (PARKING)
-                    self.ctrl_cmd_msg.steering = 0.0
-                    self.ctrl_cmd_msg.accel = 0.0
+                if output > 0.0:
+                    self.ctrl_cmd_msg.accel = output
                     self.ctrl_cmd_msg.brake = 0.0
-                    self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
-                    rate.sleep()
-                    response = self.call_service(1)
-
-                    rospy.loginfo("Finished")
-
-                    rospy.signal_shutdown("Finished parking")
-
-                #parking zone
-                elif (self.status_msg.position.x > -15.0 and self.status_msg.position.x < 45.0
-                    and self.status_msg.position.y > 1010.0 and self.status_msg.position.y <1075.0):
-
-                    if output > 0.0:
-
-                        self.ctrl_cmd_msg.accel = 10.0 / self.parking_time
-                        self.ctrl_cmd_msg.brake = 0.0
-                        self.parking_time += 0.3
-
-                    else:
-                        self.ctrl_cmd_msg.accel = 0.0
-                        self.ctrl_cmd_msg.brake = -output
-                #else
                 else:
+                    self.ctrl_cmd_msg.accel = 0.0
+                    self.ctrl_cmd_msg.brake = -output
 
-                    if output > 0.0:
-                            self.ctrl_cmd_msg.accel = output
-                            self.ctrl_cmd_msg.brake = 0.0
-
-                    # morive brake tunning
-                    elif -5.0 < output <= 0.0:
-                        self.ctrl_cmd_msg.accel = 0.0
-                        self.ctrl_cmd_msg.brake = 0.0
-
-                    else:
-                        self.ctrl_cmd_msg.accel = 0.0
-                        self.ctrl_cmd_msg.brake = -output
-
-                speeds = sqrt(pow(self.status_msg.velocity.x,2)+pow(self.status_msg.velocity.y,2))
 
                 self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
 
