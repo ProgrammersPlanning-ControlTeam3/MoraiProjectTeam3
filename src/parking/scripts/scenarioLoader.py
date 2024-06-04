@@ -10,7 +10,7 @@ class ScenarioLoader():
     def __init__(self):
         # self.path = '/home/nodazi24/Downloads/MoraiLauncher_Lin/MoraiLauncher_Lin_Data/SaveFile/Scenario/R_KR_PG_K-City/random_obstacle_scenario.json'
         # self.path = 'src\random_scenario_maker\scenario\random_obstacle_scenario.json'
-        self.path = 'src/random_scenario_maker/scenario/random_obstacle_scenario_for_test.json'
+        self.path = 'src/random_scenario_maker/scenario/sample_01.json'
         with open(self.path, 'r') as f:
             self.data = json.load(f)
         self.objectList = self.data['objectList']
@@ -18,9 +18,9 @@ class ScenarioLoader():
         self.parkingLotGoal = self.data['parkingLotGoal']
     def getObject(self) :
         return self.objectList
-    
+
     def getParkingLotStart(self) :
         return self.parkingLotStart
-    
+
     def getParkingLotGoal(self) :
         return self.parkingLotGoal
