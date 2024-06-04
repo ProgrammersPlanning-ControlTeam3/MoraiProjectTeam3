@@ -10,7 +10,7 @@ from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
 
 
-from lib.mgeo.class_defs import *
+from path_planner.scripts.lib.mgeo.class_defs import *
 
 class hybrid_a_star_pub :
     def __init__(self):
