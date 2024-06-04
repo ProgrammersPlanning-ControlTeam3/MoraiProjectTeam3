@@ -58,6 +58,7 @@ def isSameYaw(node_1, node_2, epsilon_yaw=0.2):
     SameYaw = False
     firstNodeYaw = node_1.position[2]
     secondNodeYaw = node_2.position[2]
+
     if abs(firstNodeYaw -secondNodeYaw) < epsilon_yaw:
         SameYaw = True
     else:
@@ -265,7 +266,6 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
 def main():
 
     start, goal, obstacle_list, space = map()
-
     if show_animation == True:
         theta_plot = np.linspace(0,1,101) * np.pi * 2
         plt.figure(figsize=(8,8))
@@ -282,25 +282,22 @@ def main():
         plt.xlabel("X [m]"), plt.ylabel("Y [m]")
         # plt.title("Hybrid a star algorithm", fontsize=20)
 
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.08)
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.02)
 
     print("Optimal path found!")
     len_opt_path = len(opt_path)
 
     #Dubins
     dubins = Dubins()
-    kappa_ = 1./2.0
+    kappa_ = 0.5/2.0
     
     dubins_base = [opt_path[0],opt_path[int(0.3*len_opt_path)],opt_path[int(0.6*len_opt_path)],opt_path[-1]]
-    
-    dubins_base = [opt_path[0],opt_path[int(0.2*len_opt_path)],opt_path[int(0.5*len_opt_path)],
-                   opt_path[int(0.8*len_opt_path)],opt_path[-1]]
-    
+
     #dubins_base = [opt_path[0],opt_path[8],opt_path[-8],opt_path[-1]]
     # dubins_base = opt_path
-    dubins_base = slice_list_with_interval(opt_path,6)
+    dubins_base = slice_list_with_interval(opt_path,5)
     dubins_global_path = []
-    
+
     #포인트 간의 dubins path 를 추출해줌
     for i in range(len(dubins_base)-1) :
         cartesian_path, _, _ = dubins.plan(dubins_base[i], dubins_base[i+1], kappa_)
@@ -313,10 +310,13 @@ def main():
         plt.plot(opt_path[:,0], opt_path[:,1], "m.-")
         plt.show()
 
+    return dubins_global_path
+
 def get_hybrid_a_star_dubins_global_path():
 
     start, goal, obstacle_list, space = map()
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=0.5)
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.02)
+
     print("Optimal path found!")
     len_opt_path = len(opt_path)
 
@@ -335,7 +335,11 @@ def get_hybrid_a_star_dubins_global_path():
         path_x, path_y, path_yaw = cartesian_path
         dubins_x += path_x
         dubins_y += path_y
+
     dubins_waypoint = zip(dubins_x,dubins_y)
+
+    out_path = Path()
+    out_path.header.frame_id = '/map'
 
     for waypoint in dubins_waypoint :
         path_x = waypoint[0]
@@ -344,12 +348,12 @@ def get_hybrid_a_star_dubins_global_path():
         read_pose.pose.position.x = path_x
         read_pose.pose.position.y = path_y
         read_pose.pose.orientation.w = 1
-        dubins_global_path.poses.append(read_pose)
-        
-    return dubins_global_path
+        out_path.poses.append(read_pose)
 
-if __name__ == "__main__":
-    main()
+    return out_path
+
+# if __name__ == "__main__":
+#     main()
 
 
 
