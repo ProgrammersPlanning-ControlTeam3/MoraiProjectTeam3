@@ -9,6 +9,7 @@ import copy
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
 
+
 from lib.mgeo.class_defs import *
 
 class hybrid_a_star_pub :
@@ -28,7 +29,8 @@ class hybrid_a_star_pub :
             rate.sleep()
 
 def main() :
-    hybrid_a_star_pub = hybrid_a_star_pub()
-
+    hybrid = hybrid_a_star_pub()
+    # print(hybrid)
+    
 if __name__ == "__main__":
     main()
