@@ -266,11 +266,14 @@ class stanley:
     def __init__(self):
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
         rospy.Subscriber("/lattice_path", Path, self.path_callback)
+        rospy.Subscriber("/local_path", Path, self.local_path_callback)
+
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
         rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_callback)
 
         self.is_path = False
+        self.is_local_path = False
         self.is_odom = False
         self.is_status = False
         self.is_global_path = False
@@ -314,6 +317,10 @@ class stanley:
     def path_callback(self, msg):
         self.is_path = True
         self.path = msg
+
+    def local_path_callback(self, msg):
+        self.is_local_path = True
+        self.local_path = msg
 
     def odom_callback(self, msg):
         self.is_odom = True
@@ -385,7 +392,7 @@ class stanley:
 
         self.lfd = np.clip(self.lfd, self.min_lfd, self.max_lfd)
 
-        print(self.lfd)
+        # print(self.lfd)
 
         lookahead_distance = self.lfd
         lookahead_point = None
@@ -403,6 +410,74 @@ class stanley:
 
         if lookahead_point is None:
             lookahead_point = self.path.poses[-1].pose.position
+
+        # CTE
+        dx = lookahead_point.x - self.current_position.x
+        dy = lookahead_point.y - self.current_position.y
+        cos_yaw = cos(self.vehicle_yaw)
+        sin_yaw = sin(self.vehicle_yaw)
+        cross_track_error = dx * sin_yaw - dy * cos_yaw
+
+        if abs(cross_track_error) < 100:
+            self.errors.append(abs(cross_track_error))
+
+        cross_track_error = np.clip(cross_track_error, -self.max_cross_track_error, self.max_cross_track_error)
+
+        path_point_local_x = cos(self.vehicle_yaw) * (lookahead_point.x - self.current_position.x) + sin(self.vehicle_yaw) * (lookahead_point.y - self.current_position.y)
+        path_point_local_y = -sin(self.vehicle_yaw) * (lookahead_point.x - self.current_position.x) + cos(self.vehicle_yaw) * (lookahead_point.y - self.current_position.y)
+
+        if path_point_local_y > 0:
+            cross_track_error = abs(cross_track_error)
+        else:
+            cross_track_error = -abs(cross_track_error)
+
+        dx = lookahead_point.x - self.current_position.x
+        dy = lookahead_point.y - self.current_position.y
+        path_heading = atan2(dy, dx)
+        heading_error = path_heading - self.vehicle_yaw
+
+        # [-pi, pi]
+        while heading_error > pi:
+            heading_error -= 2 * pi
+        while heading_error < -pi:
+            heading_error += 2 * pi
+
+        # alpha
+        alpha = self.alpha / max(self.status_msg.velocity.x, 0.1)
+
+        CTR = atan2(self.k * cross_track_error, self.target_velocity)
+        steering = (self.k_psi * heading_error * alpha) + (self.k_y * CTR)
+
+        return steering
+
+
+    def calc_stanley_control_local(self):
+        if not self.is_local_path or not self.is_odom or not self.is_status:
+            return 0.0
+
+        current_velocity = self.status_msg.velocity.x
+
+        self.lfd = self.lfd_gain * current_velocity
+        self.lfd = np.clip(self.lfd, self.min_lfd, self.max_lfd)
+
+        # print(self.lfd)
+
+        lookahead_distance = self.lfd
+        lookahead_point = None
+        cumulative_distance = 0.0
+
+        for i in range(len(self.local_path.poses) - 1):
+            dx = self.local_path.poses[i + 1].pose.position.x - self.local_path.poses[i].pose.position.x
+            dy = self.local_path.poses[i + 1].pose.position.y - self.local_path.poses[i].pose.position.y
+            segment_distance = sqrt(dx ** 2 + dy ** 2)
+            cumulative_distance += segment_distance
+
+            if cumulative_distance >= lookahead_distance:
+                lookahead_point = self.local_path.poses[i + 1].pose.position
+                break
+
+        if lookahead_point is None:
+            lookahead_point = self.local_path.poses[-1].pose.position
 
         # CTE
         dx = lookahead_point.x - self.current_position.x
