@@ -76,12 +76,12 @@ class latticePlanner:
         for local_pose in local_path:
             for npc in object_data.npc_list:
                 local_npc_position = self.transform_to_local(npc.position, forward_vehicle, forward_theta)
-                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1.75:
+                if 0 < (local_npc_position.x - local_pose.x) < 50 and abs(local_npc_position.y - local_pose.y) < 1.75:
                     # print("Vehicle ahead : ", local_npc_position.x - local_pose.x)
                     # print(npc.velocity.x)
                     return npc.velocity.x
 
-        return None
+        return 0
 
 
     def checkObject_npc(self, ref_path, object_data):
@@ -153,7 +153,7 @@ class latticePlanner:
         # path_size = 50
 
         path_size = self.foward_vehicle_speed
-        if self.foward_vehicle_speed is None:
+        if self.foward_vehicle_speed == 0:
             path_size = self.local_path_size
 
         short_path_size = path_size * 0.6
@@ -311,7 +311,7 @@ class latticePlanner:
                     goal_d_with_offset = vehicle_d + lane_offset
 
                     # forward vehicle's speed based target point
-                    if self.foward_vehicle_speed is not None:
+                    if self.foward_vehicle_speed > 5:
                         goal_s_with_offset = vehicle_s + min(self.target_velocity, self.foward_vehicle_speed) * time_offset
                     else :
                         goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
