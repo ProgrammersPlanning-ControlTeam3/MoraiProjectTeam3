@@ -9,7 +9,7 @@ def random_boolean(probability):
 
 def main():
     # base scenario file
-    base_file_path = 'src/random_scenario_maker/scenario/random_obstacle_base.json'
+    base_file_path = 'src/random_scenario_maker/scenario/random_base_edited.json'
 
     with open(base_file_path, 'r') as f:
         data = json.load(f)
@@ -23,7 +23,7 @@ def main():
     blankParkingSpace = []
 
     cnt = 0
-    numParkingVehicles = 30
+    numParkingVehicles = 25
     while len(object_lists) > numParkingVehicles:
         if object_lists[cnt]['DataID'] == 40100019:
             if random_boolean(0.3):
