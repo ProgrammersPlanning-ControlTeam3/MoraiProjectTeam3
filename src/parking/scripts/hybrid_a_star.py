@@ -71,11 +71,19 @@ def get_action(R, Vx, delta_time_step):
     distance_travel = Vx * delta_time_step
     # yaw_rate, delta_time_step, cost
     # left, right, 0.5 left , 0.5 right , straight
+    # TODO: set action set L S R
     action_set = [[yaw_rate, delta_time_step, distance_travel],
                   [-yaw_rate, delta_time_step, distance_travel],
                   [yaw_rate/2, delta_time_step, distance_travel],
                   [-yaw_rate/2, delta_time_step, distance_travel],
                   [0.0, delta_time_step, distance_travel]]
+    #LSR
+    action_set = [[yaw_rate, delta_time_step, distance_travel],
+                #   [-yaw_rate, delta_time_step, distance_travel],
+                  [yaw_rate/2, delta_time_step, distance_travel],
+                #   [-yaw_rate/2, delta_time_step, distance_travel],
+                  [0.0, delta_time_step, distance_travel]]
+    
     return action_set
 
 # Vehicle movement
@@ -184,7 +192,7 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
         # print("cur node = ", cur_index, cur_node.position, cur_node.f)
 
         # If goal, return optimal path
-        if (isSamePosition(cur_node, goal_node, epsilon_position=0.6) and isSameYaw(cur_node,goal_node,epsilon_yaw=0.2)):
+        if (isSamePosition(cur_node, goal_node, epsilon_position=1.5) and isSameYaw(cur_node,goal_node,epsilon_yaw=1.5)):
             opt_path = []
             node = cur_node
             while node is not None :
@@ -251,21 +259,29 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
                     open_list.append(child)
             else:
                 open_list.append(child)
+        
         # show graph
+        # TODO: plot issue point
         if show_animation:
             plt.plot(cur_node.position[0], cur_node.position[1], 'yo', alpha=0.5)
             if len(closed_list) % 100 == 0:
                 plt.pause(0.001)
+        
         #time.sleep(0.1)
         # cnt +=1
         # if cnt == 10:
         #     break
     print("vehicle can't reach to goal")
 
-
-def main():
-
+def get_opt_path() :
     start, goal, obstacle_list, space = map()
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.02)
+    return opt_path
+
+## main = plt simulation
+def main():
+    start, goal, obstacle_list, space = map()
+
     if show_animation == True:
         theta_plot = np.linspace(0,1,101) * np.pi * 2
         plt.figure(figsize=(8,8))
@@ -291,11 +307,10 @@ def main():
     dubins = Dubins()
     kappa_ = 0.5/2.0
     
-    dubins_base = [opt_path[0],opt_path[int(0.3*len_opt_path)],opt_path[int(0.6*len_opt_path)],opt_path[-1]]
-
-    #dubins_base = [opt_path[0],opt_path[8],opt_path[-8],opt_path[-1]]
-    # dubins_base = opt_path
-    dubins_base = slice_list_with_interval(opt_path,5)
+    # dubins_base = [opt_path[0],opt_path[int(0.3*len_opt_path)],opt_path[int(0.6*len_opt_path)],opt_path[-1]]
+    # dubins_base = [opt_path[0],opt_path[8],opt_path[-8],opt_path[-1]]
+    # dubins_base = slice_list_with_interval(opt_path,5)
+    dubins_base = [opt_path[-1],goal]
     dubins_global_path = []
 
     #포인트 간의 dubins path 를 추출해줌
@@ -304,7 +319,6 @@ def main():
         path_x, path_y, path_yaw = cartesian_path
         plt.plot(path_x, path_y, 'g-')
 
-
     opt_path = np.array(opt_path)
     if show_animation == True:
         plt.plot(opt_path[:,0], opt_path[:,1], "m.-")
@@ -312,6 +326,26 @@ def main():
 
     return dubins_global_path
 
+
+def hybrid_a_star():
+    start, goal, obstacle_list, space = map()
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.02)
+    
+    out_path = Path()
+    out_path.header.frame_id = '/map'
+
+    for waypoint in opt_path :
+        path_x = waypoint[0]
+        path_y = waypoint[1]
+        read_pose = PoseStamped()
+        read_pose.pose.position.x = path_x
+        read_pose.pose.position.y = path_y
+        read_pose.pose.orientation.w = 1
+        out_path.poses.append(read_pose)
+
+    return out_path
+
+# for publishing Topic
 def get_hybrid_a_star_dubins_global_path():
 
     start, goal, obstacle_list, space = map()
@@ -324,7 +358,6 @@ def get_hybrid_a_star_dubins_global_path():
     dubins = Dubins()
     kappa_ = .5/2.0
     dubins_base = [opt_path[0],opt_path[int(0.3*len_opt_path)],opt_path[int(0.6*len_opt_path)],opt_path[-1]]
-    dubins_global_path = []
     dubins_x = []
     dubins_y = []
 
@@ -352,8 +385,8 @@ def get_hybrid_a_star_dubins_global_path():
 
     return out_path
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
 
 
 
