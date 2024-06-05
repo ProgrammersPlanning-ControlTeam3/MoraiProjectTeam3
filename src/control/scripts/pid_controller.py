@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 class pidControl:
     def __init__(self):
-        self.p_gain = 0.3  # defalt 0.3
+        self.p_gain = 0.5  # defalt 0.3
         self.i_gain = 0.00
-        self.d_gain = 0.1  # defalt 0.03
+        self.d_gain = 0.03  # defalt 0.03
         self.prev_error = 0
         self.i_control = 0
         self.controlTime = 0.02
