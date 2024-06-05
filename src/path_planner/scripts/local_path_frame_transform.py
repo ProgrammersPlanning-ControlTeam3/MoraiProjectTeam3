@@ -90,7 +90,7 @@ class PathPub:
             d_target = d
 
         # 조정된 d_target 계산
-        d_adjustment = 0.7  # 중앙에 맞추기 위해 조정할 값
+        d_adjustment = 0  # 중앙에 맞추기 위해 조정할 값
         d_target += d_adjustment
 
         T = 1.0
