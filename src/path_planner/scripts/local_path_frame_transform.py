@@ -90,8 +90,8 @@ class PathPub:
             d_target = d
 
         # 조정된 d_target 계산
-        # d_adjustment = 0  # 중앙에 맞추기 위해 조정할 값
-        # d_target += d_adjustment
+        d_adjustment = 0.5   # 중앙에 맞추기 위해 조정할 값
+        d_target += d_adjustment
 
         T = 1.0
         s_coeff = self.quintic_polynomial_coeffs(s, 0, 0, s_target, 0, 0, T)
