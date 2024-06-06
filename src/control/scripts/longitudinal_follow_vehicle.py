@@ -69,7 +69,7 @@ class FollowVehicle:
                 if 0 < (local_npc_position.x - local_pose.x) < 50 and abs(local_npc_position.y - local_pose.y) < 1.75:
                     return True, local_npc_position.x - local_pose.x, npc.velocity.x
 
-        return False, 0
+        return False, 0 , 0
     
     def checkObject_npc_path(self, ref_path, object_path):
         
