@@ -30,20 +30,18 @@ class pid_feedforward:
         self.target_velocity = 40
 
         self.dt = 0.01
-        self.Kp = 0.2  # 보수적으로 설정
-        self.Kd = 0.05  # 보수적으로 설정
-        self.Ki = 0.01  # 보수적으로 설정
-        self.kff = 0.4  # 보수적으로 설정
-        self.t_lh = 0.03
-        self.d_lh = 0.0  # 초기화, ControllerInput에서 업데이트됨
-        self.error = 0.0  # 초기화, ControllerInput에서 업데이트됨
+        self.Kp = 0.05
+        self.Kd = 0.02
+        self.Ki = 0.001
+        self.kff = 0.005
+        self.error = 0.0
         self.error_prev = self.error
         self.error_d = 0.0
         self.error_i = 0.0
         self.max_delta_error = 3.0
         self.u = 0
-
-        self.coeff = None  # 초기화, 필요시 설정
+        self.feedforwardterm = 0
+        self.coeff = None
 
         self.path = None
         self.x_ego = []
@@ -60,8 +58,14 @@ class pid_feedforward:
         self.is_path = True
         self.path = msg
 
-        x = [pose.pose.position.x for pose in msg.poses]
-        y = [pose.pose.position.y for pose in msg.poses]
+        x = []
+        y = []
+
+        for pose in msg.poses:
+            global_position = pose.pose.position
+            local_position = self.transform_to_local(global_position, self.current_postion, self.vehicle_yaw)
+            x.append(local_position.x)
+            y.append(local_position.y)
 
         if len(x) > 3:
             self.coeff = np.polyfit(x, y, 3)
@@ -82,9 +86,11 @@ class pid_feedforward:
         if self.start_time is None:
             self.start_time = time.time()
 
+
     def status_callback(self, msg):
         self.is_status = True
         self.status_msg = msg
+
 
     # def polyval(self, coeff, x):
     #     x_matrix = np.zeros((1, np.size(coeff)))
@@ -130,13 +136,10 @@ class pid_feedforward:
 
         cte = perp_dist
 
-
         if abs(cte) < 100:
             self.errors.append(abs(cte))
 
         return cte
-
-
 
 
     def transform_to_local(self, global_position, reference_position, reference_theta):
@@ -148,9 +151,6 @@ class pid_feedforward:
         return Point(x=local_position[0], y=local_position[1], z=0)
 
 
-
-
-
     def calc_pid_feedforward(self):
         if not self.is_path or not self.is_odom or not self.is_status:
             return 0.0
@@ -159,10 +159,20 @@ class pid_feedforward:
         if self.coeff is None:
             return 0.0
 
-        if abs(cte) < 0.01:
-            return 0
+        max_cte = 10.0
+        cte = np.clip(cte, -max_cte, max_cte)
 
-        self.d_lh = self.t_lh * self.status_msg.velocity.x
+        if abs(cte) > 0.1:
+            self.Kp = 0.15
+            self.Kd = 0.05
+            self.Ki = 0.01
+            self.kff = 0.01
+        else:
+            self.Kp = 0.05
+            self.Kd = 0.02
+            self.Ki = 0.001
+            self.kff = 0.005
+
         self.error = cte
 
         self.error_d = (self.error - self.error_prev) / self.dt
@@ -170,25 +180,18 @@ class pid_feedforward:
         self.feedforwardterm = self.status_msg.velocity.x**2 * 2 * self.coeff[-3][0]
 
         self.u = self.Kp * self.error + self.Kd * self.error_d + self.Ki * self.error_i + self.kff * self.feedforwardterm
+
         self.error_prev = self.error
 
-        max_steering_angle = pi / 4
+        max_steering_rate = pi / 45
 
-        max_steering_rate = pi / 60  # 3도/step
-        self.u = np.clip(self.u, -max_steering_angle, max_steering_angle)
-
-        # 이전 조향 값과의 변화율 제한
         if abs(self.u - self.error_prev) > max_steering_rate:
             if self.u > self.error_prev:
                 self.u = self.error_prev + max_steering_rate
             else:
                 self.u = self.error_prev - max_steering_rate
 
-        self.u = max(-max_steering_angle, min(self.u, max_steering_angle))
-
         return self.u
-
-
 
 
     def get_current_waypoint(self, ego_status, global_path):
@@ -255,7 +258,6 @@ if __name__ == "__main__":
     while not rospy.is_shutdown():
         if pid_controller.is_path and pid_controller.is_odom and pid_controller.is_status:
             steering = pid_controller.calc_pid_feedforward()
-            rospy.loginfo(f"Steering: {steering}")
         rate.sleep()
 
     pid_controller.set_end_time()
