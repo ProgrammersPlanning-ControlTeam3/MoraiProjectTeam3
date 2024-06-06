@@ -13,7 +13,7 @@ from nav_msgs.msg import Odometry, Path
 from morai_msgs.msg import EgoVehicleStatus, ObjectStatus, ObjectStatusList, EventInfo
 from morai_msgs.srv import MoraiEventCmdSrv
 from std_msgs.msg import Int32
-from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM
+from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM, ObjectFrenetPosition
 import scipy
 from scipy.stats import norm, multivariate_normal
 from filter import Extended_KalmanFilter, IMM_filter
@@ -24,7 +24,6 @@ from std_msgs.msg import String
 # from frame_transform import *
 
 from model import CTRA, CA
-
 
 ##################          HMM MODEL           ###############
 class VehicleBehaviorHMM:
@@ -125,6 +124,7 @@ class VehicleTracker():
         rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_info_callback)
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
         self.state_prediction = rospy.Publisher("/Object_topic/hmm_prediction", PredictedHMM, queue_size= 10)
+        self.object_position_frenet = rospy.Publisher("/Object_topic/frenet_position", ObjectFrenetPosition, queue_size=10)
 
         self.dt=dt
         self.T=T
@@ -153,7 +153,6 @@ class VehicleTracker():
     ##########   CALLBACK Function   ########
     # Object Callback Function, Get the object info
     def object_info_callback(self, msg):
-        #rospy.loginfo("Received Message")
         self.is_object=True
         self.object_data = msg
 
@@ -226,6 +225,9 @@ class VehicleTracker():
                     # data = [obstacle.position.x, obstacle.position.y, radians(obstacle.heading), v, a, yaw_rate]
                     x = obstacle.position.x
                     y = obstacle.position.y
+                    velocity_x = obstacle.velocity.x
+                    velocity_y = obstacle.velocity.y
+                    current_speed =np.sqrt(velocity_x**2 + velocity_y**2)
 
                     mapx = [pose.pose.position.x for pose in self.global_path_msg.poses]
                     mapy = [pose.pose.position.y for pose in self.global_path_msg.poses]
@@ -235,16 +237,16 @@ class VehicleTracker():
                     # Normalize d value (frenet coordinate value of each object(vehicle))
                     if d>0:
                         d_int = d // self.lane_width
-                        d = d - d_int * self.lane_width
+                        d_new = d - d_int * self.lane_width
 
                     if d<0:
                         d_int = d// self.lane_width +1
-                        d = d - d_int * self.lane_width
+                        d_new = d - d_int * self.lane_width
 
                     # Probability, b_ij, #Emission Possibility
                     # Observation Sequence (d_lat, v)
 
-                    observation = (d, data[3])
+                    observation = (d_new, data[3])
                     print("observation:: ", observation)
                     #TODO(5) : HMM Model and Publish the TOPIC
                     if obj_id not in self.hmm_models:
@@ -260,6 +262,11 @@ class VehicleTracker():
                         predicted_object = PredictedHMM(unique_id = obj_id, maneuver=predicted_state, probability=probability)
                         predicted_list.append(predicted_object)
                         # prediction_msg = f"Object ID: {obj_id}, Predicted State: {predicted_state}, Probability: {probability:.4f}"
+
+                        #position message of frenet point
+                        frenet_point = ObjectFrenetPosition(unique_id = obj_id, s =s, d=d, speed= current_speed)
+                        self.object_position_frenet.publish(frenet_point)
+                        print("Frenet Point of Object", frenet_point)
                         print("prediction message", predicted_list)
                         # Publish ROS TOPIC
                         self.state_prediction.publish(predicted_object)
