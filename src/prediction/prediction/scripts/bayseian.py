@@ -3,7 +3,7 @@
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../msg'))
-sys.path.insert(0, '/home/henricus/final_project/src')
+sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 import numpy as np
 import time
 import rospy

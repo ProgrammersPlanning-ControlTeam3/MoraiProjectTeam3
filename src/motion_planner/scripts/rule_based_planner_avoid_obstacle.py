@@ -18,7 +18,7 @@ import sys
 current_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_path)
 
-from lib.mgeo.class_defs import *
+# from lib.mgeo.class_defs import *
 sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 #print(sys.path)
 
