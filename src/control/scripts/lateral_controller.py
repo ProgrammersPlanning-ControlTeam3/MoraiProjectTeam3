@@ -139,6 +139,7 @@ class pure_pursuit_no_npc:
 
 class pure_pursuit:
     def __init__(self):
+        rospy.Subscriber("/global_path", Path, self.global_path_callback)
         rospy.Subscriber("/lattice_path", Path, self.path_callback)
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
@@ -146,6 +147,7 @@ class pure_pursuit:
         self.is_path = False
         self.is_odom = False
         self.is_status = False
+        self.is_global_path = False
 
         self.forward_point = Point()
         self.current_postion = Point()
@@ -162,6 +164,12 @@ class pure_pursuit:
         self.start_time = None
         self.end_time = None
         self.errors = []
+
+
+    def global_path_callback(self, msg):
+        self.global_path = msg
+        self.is_global_path = True
+
 
     def path_callback(self, msg):
         self.is_path = True
@@ -458,6 +466,7 @@ class stanley:
         current_velocity = self.status_msg.velocity.x
 
         self.lfd = self.lfd_gain * current_velocity
+
         self.lfd = np.clip(self.lfd, self.min_lfd, self.max_lfd)
 
         # print(self.lfd)
@@ -563,31 +572,31 @@ def plot_paths(global_path, x_ego, y_ego, total_time, variance, mean_error, max_
 
     plt.show()
 
-# if __name__ == "__main__":
-#     rospy.init_node('path_tracking_node', anonymous=True)
+if __name__ == "__main__":
+    rospy.init_node('path_tracking_node', anonymous=True)
 
-#     pure_pursuit_controller = pure_pursuit_no_npc()
-#     stanley_controller = stanley()
+    pure_pursuit_controller = pure_pursuit()
+    stanley_controller = stanley()
 
-#     rate = rospy.Rate(10)  # 10 Hz
-#     while not rospy.is_shutdown():
-#         if pure_pursuit_controller.is_path and pure_pursuit_controller.is_odom and pure_pursuit_controller.is_status:
-#             pure_pursuit_controller.calc_pure_pursuit()
-#         if stanley_controller.is_path and stanley_controller.is_odom and stanley_controller.is_status:
-#             stanley_controller.calc_stanley_control()
-#         rate.sleep()
+    rate = rospy.Rate(10)  # 10 Hz
+    while not rospy.is_shutdown():
+        if pure_pursuit_controller.is_path and pure_pursuit_controller.is_odom and pure_pursuit_controller.is_status:
+            pure_pursuit_controller.calc_pure_pursuit()
+        if stanley_controller.is_path and stanley_controller.is_odom and stanley_controller.is_status:
+            stanley_controller.calc_stanley_control()
+        rate.sleep()
 
-#     # End the simulation by setting the end time
-#     pure_pursuit_controller.set_end_time()
-#     stanley_controller.set_end_time()
+    # End the simulation by setting the end time
+    pure_pursuit_controller.set_end_time()
+    stanley_controller.set_end_time()
 
-#     if pure_pursuit_controller.path is not None:
-#         mean_error, max_error, variance = pure_pursuit_controller.calculate_statistics()
-#         plot_paths(pure_pursuit_controller.path, pure_pursuit_controller.x_ego, pure_pursuit_controller.y_ego,
-#                    pure_pursuit_controller.calculate_total_time(), variance, mean_error, max_error)
+    if pure_pursuit_controller.global_path is not None:
+        mean_error, max_error, variance = pure_pursuit_controller.calculate_statistics()
+        plot_paths(pure_pursuit_controller.global_path, pure_pursuit_controller.x_ego, pure_pursuit_controller.y_ego,
+                   pure_pursuit_controller.calculate_total_time(), variance, mean_error, max_error)
 
-#     if stanley_controller.global_path is not None:
-#         mean_error, max_error, variance = stanley_controller.calculate_statistics()
-#         plot_paths(stanley_controller.global_path, stanley_controller.x_ego, stanley_controller.y_ego,
-#                    stanley_controller.calculate_total_time(), variance, mean_error, max_error)
+    if stanley_controller.global_path is not None:
+        mean_error, max_error, variance = stanley_controller.calculate_statistics()
+        plot_paths(stanley_controller.global_path, stanley_controller.x_ego, stanley_controller.y_ego,
+                   stanley_controller.calculate_total_time(), variance, mean_error, max_error)
 
