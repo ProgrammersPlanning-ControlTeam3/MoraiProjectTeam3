@@ -7,9 +7,10 @@ import numpy as np
 from tf.transformations import euler_from_quaternion
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry, Path
-from morai_msgs.msg import EgoVehicleStatus
+from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
 import matplotlib.pyplot as plt
 import time
+
 
 class pid_feedforward:
     def __init__(self):
@@ -17,6 +18,7 @@ class pid_feedforward:
         rospy.Subscriber("/lattice_path", Path, self.path_callback)
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
+        rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_callback)
 
         self.is_path = False
         self.is_odom = False
@@ -50,9 +52,15 @@ class pid_feedforward:
         self.end_time = None
         self.errors = []
 
+        self.lookahead_distance = 10  # Lookahead distance 설정
+
     def global_path_callback(self, msg):
         self.global_path = msg
         self.is_global_path = True
+
+    def object_callback(self, msg):
+        self.is_obj = True
+        self.object_data = msg
 
     def path_callback(self, msg):
         self.is_path = True
@@ -86,18 +94,19 @@ class pid_feedforward:
         if self.start_time is None:
             self.start_time = time.time()
 
-
     def status_callback(self, msg):
         self.is_status = True
         self.status_msg = msg
 
 
-    # def polyval(self, coeff, x):
-    #     x_matrix = np.zeros((1, np.size(coeff)))
-    #     for i in range(np.size(coeff)):
-    #         x_matrix[0][i] = x**(np.size(coeff)-1-i)
-    #     y = x_matrix @ coeff
-    #     return y[0][0]
+    def transform_to_local(self, global_position, reference_position, reference_theta):
+        translation = np.array([global_position.x - reference_position.x,
+                                global_position.y - reference_position.y])
+        rotation_matrix = np.array([[cos(-reference_theta), -sin(-reference_theta)],
+                                    [sin(-reference_theta), cos(-reference_theta)]])
+        local_position = rotation_matrix.dot(translation)
+        return Point(x=local_position[0], y=local_position[1], z=0)
+
 
     def compute_cte(self):
         if self.path is None or not self.path.poses:
@@ -106,6 +115,8 @@ class pid_feedforward:
         min_dist = float('inf')
         closest_point = None
         closest_idx = 0
+
+        # 현재 위치에서 가장 가까운 점 찾기
         for i, pose in enumerate(self.path.poses):
             global_position = pose.pose.position
             local_position = self.transform_to_local(global_position, self.current_postion, self.vehicle_yaw)
@@ -120,35 +131,27 @@ class pid_feedforward:
             return 0.0
 
         next_point = None
-        if closest_idx + 1 < len(self.path.poses):
-            global_next_position = self.path.poses[closest_idx + 1].pose.position
-            next_point = self.transform_to_local(global_next_position, self.current_postion, self.vehicle_yaw)
-        else:
-            next_point = closest_point
+        lookahead_dist = 0.0
 
-        path_dx = next_point.x - closest_point.x
-        path_dy = next_point.y - closest_point.y
-        path_yaw = atan2(path_dy, path_dx)
+        next_point = closest_point
 
-        dx = closest_point.x
-        dy = closest_point.y
-        perp_dist = sqrt(dx**2 + dy**2) * sin(atan2(dy, dx) - path_yaw)
+        if self.is_obstacle_nearby():
+            # Lookahead distance를 정확히 반영하여 다음 지점 선택
+            for i in range(closest_idx, len(self.path.poses)):
+                global_position = self.path.poses[i].pose.position
+                local_position = self.transform_to_local(global_position, self.current_postion, self.vehicle_yaw)
+                lookahead_dist = sqrt(local_position.x**2 + local_position.y**2)
+                if lookahead_dist >= self.lookahead_distance:
+                    next_point = local_position
+                    break
 
-        cte = perp_dist
+        # Lookahead point에서의 횡방향 거리 계산
+        cte = next_point.y  # 횡방향 거리만 사용하여 CTE 계산
 
         if abs(cte) < 100:
             self.errors.append(abs(cte))
 
         return cte
-
-
-    def transform_to_local(self, global_position, reference_position, reference_theta):
-        translation = np.array([global_position.x - reference_position.x,
-                                global_position.y - reference_position.y])
-        rotation_matrix = np.array([[cos(-reference_theta), -sin(-reference_theta)],
-                                    [sin(-reference_theta), cos(-reference_theta)]])
-        local_position = rotation_matrix.dot(translation)
-        return Point(x=local_position[0], y=local_position[1], z=0)
 
 
     def calc_pid_feedforward(self):
@@ -162,11 +165,14 @@ class pid_feedforward:
         max_cte = 10.0
         cte = np.clip(cte, -max_cte, max_cte)
 
-        if abs(cte) > 0.1:
-            self.Kp = 0.15
-            self.Kd = 0.05
-            self.Ki = 0.01
-            self.kff = 0.01
+        check_value = False
+
+        if abs(cte) > 1.0:
+            self.Kp = 0.8
+            self.Kd = 0.5
+            self.Ki = 0.000
+            self.kff = 0.000
+            check_value = True
         else:
             self.Kp = 0.05
             self.Kd = 0.02
@@ -174,6 +180,7 @@ class pid_feedforward:
             self.kff = 0.005
 
         self.error = cte
+        print(cte)
 
         self.error_d = (self.error - self.error_prev) / self.dt
         self.error_i = self.error_i + self.error * self.dt
@@ -181,17 +188,37 @@ class pid_feedforward:
 
         self.u = self.Kp * self.error + self.Kd * self.error_d + self.Ki * self.error_i + self.kff * self.feedforwardterm
 
+        if abs(cte) <= 1.0:
+            max_steering_rate = pi / 45
+            if abs(self.u - self.error_prev) > max_steering_rate:
+                if self.u > self.error_prev:
+                    self.u = self.error_prev + max_steering_rate
+                else:
+                    self.u = self.error_prev - max_steering_rate
+
+        # if check_value:
+        #     print(self.Kp * self.error)
+        #     print(self.Kd * self.error_d)
+        #     print(self.Ki * self.error_i)
+        #     print(self.kff * self.feedforwardterm)
+        #     print(self.Kp * self.error + self.Kd * self.error_d + self.Ki * self.error_i + self.kff * self.feedforwardterm)
+        #     print (self.u, "\n")
+
         self.error_prev = self.error
 
-        max_steering_rate = pi / 45
-
-        if abs(self.u - self.error_prev) > max_steering_rate:
-            if self.u > self.error_prev:
-                self.u = self.error_prev + max_steering_rate
-            else:
-                self.u = self.error_prev - max_steering_rate
-
         return self.u
+
+
+    def is_obstacle_nearby(self):
+        if not self.is_obj:
+            return False
+
+        for obj in self.object_data.npc_list:
+            local_position = self.transform_to_local(obj.position, self.current_postion, self.vehicle_yaw)
+            distance = sqrt(local_position.x**2 + local_position.y**2)
+            if distance < 30 and local_position.x > -15 and abs(local_position.y) < 5 :
+                return True
+        return False
 
 
     def get_current_waypoint(self, ego_status, global_path):

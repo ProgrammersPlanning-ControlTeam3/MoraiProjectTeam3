@@ -24,8 +24,10 @@ sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 
 from control.scripts.pid_controller import pidControl
 from control.scripts.lateral_controller_PID import pid_feedforward
+# from control.scripts.lateral_controller import pure_pursuit
 from control.scripts.longitudinal_controller import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
+from control.scripts.longitudinal_follow_vehicle import FollowVehicle
 
 class rule_based_planner:
     def __init__(self):
@@ -39,7 +41,7 @@ class rule_based_planner:
         # GET OBJECT TOPIC
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber('/Ego_topic', EgoVehicleStatus, self.status_callback)
-        rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_callback)
+        # rospy.Subscriber("/Object_topic", data_class=ObjectStatusList, self.object_callback)
         # PUBLISHING CONTROL TOPIC, Name ctrl_cmd_pub Get CtrlCmd Topic
         self.ctrl_cmd_pub = rospy.Publisher('ctrl_cmd_0', CtrlCmd, queue_size=1)
         # 객체 정보 수신
@@ -64,7 +66,9 @@ class rule_based_planner:
         self.pid = pidControl() # PID Control
         self.vel_planning = velocityPlanning(self.target_velocity / 3.6, 0.15) # Velocity Control
         self.pid_feedforward = pid_feedforward() # Pure Pursuit control
-        self.object_detector = object_detector() # Object Detection to avoid
+        self.follow_vehicle = FollowVehicle()
+        # self.pure_pursuit = pure_pursuit() # Pure Pursuit control
+        # self.object_detector = object_detector() # Object Detection to avoid
 
         # 무한 루프: self.is_global_path가 True로 설정될때까지 계속 실행.
         while True:
@@ -82,23 +86,29 @@ class rule_based_planner:
                 prev_time = time.time()
 
                 self.current_waypoint = self.pid_feedforward.get_current_waypoint(self.status_msg, self.global_path)
+                # self.current_waypoint = self.pure_pursuit.get_current_waypoint(self.status_msg, self.global_path)
+
                 self.target_velocity = self.velocity_list[self.current_waypoint] * 3.6
+
+                ## TODO target_velocity -> 감속 (앞 차량이 있거나, 예측 경로와 겹칠 경우)
+                self.re_target_velocity = self.follow_vehicle.control_velocity(self.target_velocity)
+                # steering = self.stanley.calc_stanley_control()
+                # steering = self.pure_pursuit.calc_pure_pursuit()
+                # TODO tollgate area : No lattice path. Follow local path. Need to make follow local path method in stanley class
+                # steering = self.stanley.calc_stanley_control_local()
 
                 steering = self.pid_feedforward.calc_pid_feedforward()
 
-                if self.is_look_forward_point:
-                    self.ctrl_cmd_msg.steering = steering
-                else:
-                    self.ctrl_cmd_msg.steering = steering #0.0 last
+                self.ctrl_cmd_msg.steering = steering #0.0 last
 
-                output = self.pid.pid(self.target_velocity, self.status_msg.velocity.x * 3.6)
-
+                output = self.pid.pid(self.re_target_velocity, self.status_msg.velocity.x * 3.6)
                 if output > 0.0:
                     self.ctrl_cmd_msg.accel = output
                     self.ctrl_cmd_msg.brake = 0.0
                 else:
                     self.ctrl_cmd_msg.accel = 0.0
                     self.ctrl_cmd_msg.brake = -output
+
 
                 self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
 
