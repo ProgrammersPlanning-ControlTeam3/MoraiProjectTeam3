@@ -5,8 +5,12 @@
   <node pkg="path_planner" type="lattice_planner_LC.py" name="lattice_path_pub" output="screen"/>
 
   <!-- Parking Path -->
-  <node pkg="parking" type="global_path_pub.py" name="global_path_pub" />
+  <!-- <node pkg="parking" type="parking_global_path_pub.py" name="parking_global_path_pub" /> -->
+
+  <!-- visualize Obstacle -->
+  <node pkg="parking" type="visualizeObstacle.py.py" name="visualize_obstacle" />
   
+
   <!-- <node pkg="parking" type="path_maker.py" name="parking" /> -->
 
   <!-- CONTROL_Pure Pursuit -->
