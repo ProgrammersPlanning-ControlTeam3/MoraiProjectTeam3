@@ -25,7 +25,7 @@ def making_dataset(sequence):
     return X, Y, CHECK
 
 
-FileList = glob.glob("/home/mmc_ubuntu/Work/programmers/2023/HMM_modeling/*_rev.pickle")
+# FileList = glob.glob("/home/mmc_ubuntu/Work/programmers/2023/HMM_modeling/*_rev.pickle")
 coord_init = [326130, 340830]
 
 print(FileList)    

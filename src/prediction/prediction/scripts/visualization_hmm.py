@@ -28,15 +28,26 @@ class HMMPredictionVisualizeNode:
 
     def publish_visualization_data(self, prediction):
         intention_markers = MarkerArray()
-        maneuver_marker = Marker(Marker.TEXT_VIEW_FACING, header=prediction.header,
-                                 id=prediction.unique_id, text=prediction.maneuver,
-                                 scale=Vector3(0.2,0.2,0.2), color = ColorRGBA(1.0, 0.0, 0.0,))
+        maneuver_marker = Marker(
+            type=Marker.TEXT_VIEW_FACING,
+            header=prediction.header,
+            id=prediction.unique_id,
+            text=prediction.maneuver,
+            scale=Vector3(0.2, 0.2, 0.2),
+            color=ColorRGBA(1.0, 0.0, 0.0, 1.0)
+        )
         intention_markers.markers.append(maneuver_marker)
 
         maneuver_markers = MarkerArray()
-        probability_marker = Marker(Marker.CUBE, header=prediction.header,
-                                    id=prediction.unique_id, text=str(prediction.probability),
-                                    scale=Vector3(0.2, 0.2, prediction.probability), color=ColorRGBA(0.0, 1.0, 0.0 ,1.0))
+        probability_marker = Marker(
+            type=Marker.CUBE,
+            header=prediction.header,
+            id=prediction.unique_id,
+            text=str(prediction.probability),
+            scale=Vector3(0.2, 0.2, prediction.probability),
+            color=ColorRGBA(0.0, 1.0, 0.0, 1.0)
+        )
+
         maneuver_markers.markers.append(probability_marker)
         self.intention_publisher.publish(intention_markers)
         self.maneuver_publisher.publish(maneuver_markers)

@@ -25,6 +25,7 @@ add_message_files(
   PredictedObjectPathList.msg
   TrackedObjectPose.msg
   TrackedObjectPoseList.msg
+  PredictedHMM.msg
 )
 generate_messages(
   DEPENDENCIES
