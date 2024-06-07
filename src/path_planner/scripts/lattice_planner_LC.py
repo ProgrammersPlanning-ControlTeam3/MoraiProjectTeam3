@@ -5,7 +5,7 @@ import os, sys
 import rospy
 from math import cos, sin, pi, sqrt, pow, atan2
 from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
-from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList
+from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM
 from geometry_msgs.msg import Point, PoseStamped, Point32
 from nav_msgs.msg import Path, Odometry
 from std_msgs.msg import Int32
@@ -26,6 +26,7 @@ class latticePlanner:
         rospy.Subscriber('/Object_topic/tracked_object_pose_topic', TrackedObjectPoseList, self.object_info_callback)
         rospy.Subscriber('/Object_topic/tracked_object_path_topic', PredictedObjectPathList, self.object_path_callback)
         rospy.Subscriber('/Object_topic/deleted_object_id', Int32, self.deleted_object_callback)
+        rospy.Subscriber('/Object_topic/hmm_prediction', PredictedHMM, self.prediction_info_callback)
 
         self.lattice_path_pub = rospy.Publisher('/lattice_path', Path, queue_size=1)
 
@@ -35,6 +36,7 @@ class latticePlanner:
         self.is_pose_received = False
         self.object_pose = None
         self.is_path_received = False
+        self.is_prediction_received = False
         self.object_path = None
         self.deleted_ids = set()
 
@@ -45,8 +47,12 @@ class latticePlanner:
         rate = rospy.Rate(30)  # 30hz
         while not rospy.is_shutdown():
             if self.is_path and self.is_status and self.is_obj:
-                
-                self.foward_vehicle_speed = self.get_forward_vehicle(self.local_path, self.object_data)
+                forward_vehicle = self.get_forward_vehicle(self.local_path, self.object_data)
+                if forward_vehicle is not None:
+                    self.foward_vehicle_speed = forward_vehicle.velocity.x
+
+                    if self.is_prediction_received:
+                        self.npc_intension(forward_vehicle.unique_id)
                 lattice_path = self.latticePlanner(self.local_path, self.x, self.y)
                 lattice_path_index = self.collision_check(self.object_data, self.object_path, lattice_path)
 
@@ -54,6 +60,13 @@ class latticePlanner:
                 self.lattice_path_pub.publish(lattice_path[lattice_path_index])
 
             rate.sleep()
+
+    # TODO : When Forward/Right/Left vehicle is nearby. Need to create function returning nearby vehicle
+    def npc_intension(self, nearby_vehicle_idx):
+        if nearby_vehicle_idx == self.prediction_data.unique_id:
+            print(self.prediction_data.maneuver)
+            print(self.prediction_data.probability)
+            print("\n\n\n\n\n")
 
 
     def transform_to_local(self, global_position, reference_position, reference_theta):
@@ -63,7 +76,6 @@ class latticePlanner:
                                     [sin(-reference_theta), cos(-reference_theta)]])
         local_position = rotation_matrix.dot(translation)
         return Point(x=local_position[0], y=local_position[1], z=0)
-
 
     def get_forward_vehicle(self, ref_path, object_data):
 
@@ -79,13 +91,11 @@ class latticePlanner:
                 if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1.75:
                     # print("Vehicle ahead : ", local_npc_position.x - local_pose.x)
                     # print(npc.velocity.x)
-                    return npc.velocity.x
-
-        return 0
-
+                    return npc
+        return None
 
     def checkObject_npc(self, ref_path, object_data):
-        
+
         def is_collision_distance(path_pose, obj_position, threshold):
             dis = sqrt(pow(path_pose.x - obj_position.x, 2) + pow(path_pose.y - obj_position.y, 2))
             return dis < threshold
@@ -129,21 +139,6 @@ class latticePlanner:
                             return True
         return False    
 
-
-    def get_forward_vehicle_id(self, ref_path, object_data):
-        vehicle_position = ref_path.poses[0].pose.position
-        theta = atan2(ref_path.poses[1].pose.position.y - vehicle_position.y,
-                    ref_path.poses[1].pose.position.x - vehicle_position.x)
-
-        local_path = [self.transform_to_local(pose.pose.position, vehicle_position, theta) for pose in ref_path.poses]
-
-        for local_pose in local_path:
-            for npc in object_data.npc_list:
-                local_npc_position = self.transform_to_local(npc.position, vehicle_position, theta)
-                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1.75:
-                    return npc.unique_id
-        return None
-
     def collision_check(self, object_data, object_path, out_path):
         # 생성된 충돌 회피 경로 중 낮은 비용의 경로 선택
 
@@ -162,7 +157,9 @@ class latticePlanner:
             dis = sqrt(pow(path_pose.pose.position.x - predicted_pose.x, 2) + pow(path_pose.pose.position.y - predicted_pose.y, 2))
             return dis < threshold
 
-        forward_vehicle_id = self.get_forward_vehicle_id(self.local_path, object_data)
+        forward_vehicle_check = self.get_forward_vehicle(self.local_path, object_data)
+        if forward_vehicle_check is not None:
+            forward_vehicle_id = forward_vehicle_check.unique_id
 
         for obstacle in object_data.npc_list:
             for path_num in range(len(out_path)):
@@ -225,7 +222,6 @@ class latticePlanner:
         return selected_lane
 
 
-
     def path_callback(self, msg):
         self.is_path = True
         self.local_path = msg
@@ -238,7 +234,6 @@ class latticePlanner:
         self.is_status=True
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
-
 
     def object_callback(self, msg):
         self.is_obj = True
@@ -255,6 +250,9 @@ class latticePlanner:
     def deleted_object_callback(self, msg):
         self.deleted_ids.add(msg.data)
 
+    def prediction_info_callback(self, msg):
+        self.is_prediction_received = True
+        self.prediction_data = msg
 
     def generate_5th_order_polynomial(self, ys, yf, xs, xf):
         # 5차 곡선 계수 계산
@@ -287,12 +285,15 @@ class latticePlanner:
         look_distance = min(look_distance, max_look_distance)
 
         if len(ref_path.poses) > look_distance:
-            # 지도 데이터
             mapx = [pose.pose.position.x for pose in ref_path.poses]
             mapy = [pose.pose.position.y for pose in ref_path.poses]
-            maps = [0]
-            for i in range(1, len(mapx)):
-                maps.append(maps[-1] + get_dist(mapx[i-1], mapy[i-1], mapx[i], mapy[i]))
+
+            maps = np.zeros(len(mapx))
+            for i in range(len(mapx)):
+                x = mapx[i]
+                y = mapy[i]
+                sd = get_frenet(x, y, mapx, mapy)
+                maps[i] = sd[0]
 
             global_ref_end_point = (ref_path.poses[look_distance * 2].pose.position.x,
                                     ref_path.poses[look_distance * 2].pose.position.y)
