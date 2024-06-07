@@ -11,8 +11,14 @@ from nav_msgs.msg import Path
 
 current_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_path)
+sys.path.append('/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src')
+
 
 from lib.mgeo.class_defs import *
+from parking.scripts import hybrid_a_star
+
+
+isArrived = False
 
 ## USING DIJKSTRA PATH PLANNING TO GLOBAL PATH PLANNING
 class dijkstra_path_pub :
@@ -46,13 +52,35 @@ class dijkstra_path_pub :
         tollgate = 'A119BS010324'
         parking_lot = 'custom'
         parking_entrance = 'start'
+        
+        #주차장 입구까지만 고려
+        #이후 주차장 경로는 주차장 global path를 통해 찾기.
         parking_zone = 'parking'
 
-        self.node_list = [start,highway1, highway2,tollgate, parking_lot, parking_entrance, parking_zone]
+        self.node_list = [start,highway1, highway2,tollgate, parking_lot, parking_entrance]
         self.global_path_msg = Path()
         self.global_path_msg.header.frame_id = '/map'
 
         self.global_path_msg = self.calc_dijkstra_path_node(self.node_list)
+
+        #global_path Parking
+        # self.global_path_parking_waypoint, _ = hybrid_a_star.get_hybrid_a_star_dubins_global_path()
+        
+        parking_waypoint, _ = hybrid_a_star.hybrid_a_star()
+        
+        # print(len(parking_waypoint))
+
+        for waypoint in parking_waypoint :
+            # print(waypoint)
+            path_x = waypoint[0]
+            path_y = waypoint[1]
+            read_pose = PoseStamped()
+            read_pose.pose.position.x = path_x
+            read_pose.pose.position.y = path_y
+            read_pose.pose.orientation.w = 1
+            self.global_path_msg.poses.append(read_pose)
+        
+        # self.global_path_msg += self.global_path_parking_msg
 
         rate = rospy.Rate(10) # 10hz
         while not rospy.is_shutdown() :
@@ -74,7 +102,7 @@ class dijkstra_path_pub :
                 read_pose.pose.position.x = path_x
                 read_pose.pose.position.y = path_y
                 read_pose.pose.orientation.w = 1
-                out_path.poses.append(read_pose)   
+                out_path.poses.append(read_pose)
 
         return out_path
 
