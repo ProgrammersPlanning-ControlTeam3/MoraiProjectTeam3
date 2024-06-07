@@ -23,7 +23,7 @@ class pure_pursuit_no_npc:
         self.is_status = False
 
         self.forward_point = Point()
-        self.current_postion = Point()
+        self.current_position = Point()
 
         self.vehicle_length = 5.205  # Hyundai Ioniq (hev)
         self.lfd = 10
@@ -47,10 +47,10 @@ class pure_pursuit_no_npc:
         odom_quaternion = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z,
                            msg.pose.pose.orientation.w)
         _, _, self.vehicle_yaw = euler_from_quaternion(odom_quaternion)
-        self.current_postion.x = msg.pose.pose.position.x
-        self.current_postion.y = msg.pose.pose.position.y
-        self.x_ego.append(self.current_postion.x)
-        self.y_ego.append(self.current_postion.y)
+        self.current_position.x = msg.pose.pose.position.x
+        self.current_position.y = msg.pose.pose.position.y
+        self.x_ego.append(self.current_position.x)
+        self.y_ego.append(self.current_position.y)
 
         if self.start_time is None:
             self.start_time = time.time()
@@ -83,7 +83,7 @@ class pure_pursuit_no_npc:
             self.lfd = self.min_lfd
         elif self.lfd > self.max_lfd:
             self.lfd = self.max_lfd
-        vehicle_position = self.current_postion
+        vehicle_position = self.current_position
         self.is_look_forward_point = False
 
         translation = [vehicle_position.x, vehicle_position.y]
@@ -150,7 +150,7 @@ class pure_pursuit:
         self.is_global_path = False
 
         self.forward_point = Point()
-        self.current_postion = Point()
+        self.current_position = Point()
 
         self.vehicle_length = 5.205  # Hyundai Ioniq (hev)
         self.lfd = 10
@@ -180,10 +180,10 @@ class pure_pursuit:
         odom_quaternion = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z,
                            msg.pose.pose.orientation.w)
         _, _, self.vehicle_yaw = euler_from_quaternion(odom_quaternion)
-        self.current_postion.x = msg.pose.pose.position.x
-        self.current_postion.y = msg.pose.pose.position.y
-        self.x_ego.append(self.current_postion.x)
-        self.y_ego.append(self.current_postion.y)
+        self.current_position.x = msg.pose.pose.position.x
+        self.current_position.y = msg.pose.pose.position.y
+        self.x_ego.append(self.current_position.x)
+        self.y_ego.append(self.current_position.y)
 
         if self.start_time is None:
             self.start_time = time.time()
@@ -216,7 +216,7 @@ class pure_pursuit:
             self.lfd = self.min_lfd
         elif self.lfd > self.max_lfd:
             self.lfd = self.max_lfd
-        vehicle_position = self.current_postion
+        vehicle_position = self.current_position
         self.is_look_forward_point = False
 
         translation = [vehicle_position.x, vehicle_position.y]
@@ -378,12 +378,21 @@ class stanley:
             return False
 
         for obj in self.object_data.npc_list:
-            dx = obj.position.x - self.current_position.x
-            dy = obj.position.y - self.current_position.y
-            distance = sqrt(dx**2 + dy**2)
-            if distance < 50:
+            local_position = self.transform_to_local(obj.position, self.current_position, self.vehicle_yaw)
+            distance = sqrt(local_position.x**2 + local_position.y**2)
+            if distance < 50 and local_position.x > -15 and abs(local_position.y) < 5 :
                 return True
         return False
+
+
+    def transform_to_local(self, global_position, reference_position, reference_theta):
+        translation = np.array([global_position.x - reference_position.x,
+                                global_position.y - reference_position.y])
+        rotation_matrix = np.array([[cos(-reference_theta), -sin(-reference_theta)],
+                                    [sin(-reference_theta), cos(-reference_theta)]])
+        local_position = rotation_matrix.dot(translation)
+        return Point(x=local_position[0], y=local_position[1], z=0)
+
 
     def calc_stanley_control(self):
         if not self.is_path or not self.is_odom or not self.is_status:
