@@ -14,8 +14,8 @@
   <node pkg="map_loader" type="mgeo_pub.py" name="mgeo_pub" />
 
   <!--Prediction-->
-  <node pkg="prediction" type="vehicle_tracker.py" name="vehicle_tracker" output="screen" />
-  <node pkg="prediction" type="visualization.py" name="prediction_visualization" output="screen" />
+  <node pkg="prediction" type="bayseian.py" name="bayseian" output="screen" />
+  <node pkg="prediction" type="visualization_hmm.py" name="visualization_hmm" output="screen" />
 
   <!-- RVIZ -->
   <node pkg = "rviz_runner" type="tf_pub.py" name="tf" />
