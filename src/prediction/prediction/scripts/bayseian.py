@@ -65,11 +65,30 @@ class VehicleBehaviorHMM:
         # Lane Keeping Profile Probability
         p_lkv = lambda x, v: multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(x)**2),0.4) if x > 0 else multivariate_normal.pdf(v, ((2/self.lane_width)**2*self.v_max*(x)**2),0.4)
 
+        # Probability Normalization
+        ## 이거 추가하니까 안되는데.
+        p_lcv_val = p_lcv(d_lat, v)
+        p_lcv_minus_val = p_lcv_minus(d_lat, v)
+        p_lkv_val = p_lkv(d_lat, v)
+        print("Calculated probabilites: ", p_lkv_val, p_lcv_val, p_lcv_minus_val)
+
+        total_probability = p_lcv_val + p_lcv_minus_val + p_lkv_val
+        if total_probability > 0:
+            p_lcv_val /= total_probability
+            p_lcv_minus_val /= total_probability
+            p_lkv_val /= total_probability
+        else:
+            rospy.logwarn("Total probability is zero,,, error!!")
+
+        print("Possibility of p_lk ", p_lkv_val)
+        print("Possibility of left lane change" , p_lcv_val)
+        print("Possibility of right lane change", p_lcv_minus_val)
+
         # 방출 확률 계산
         emission_probabilities = np.array([
-            p_lkv(d_lat, v),  # Lane Keeping
-            p_lcv(d_lat, v),  # Right Lane Change
-            p_lcv_minus(d_lat, v)  # Left Lane Change
+            p_lkv_val,  # Lane Keeping
+            p_lcv_val,  # Right Lane Change
+            p_lcv_minus_val  # Left Lane Change
         ])
         print("Emission matrix", emission_probabilities)
 
@@ -101,14 +120,14 @@ class VehicleBehaviorHMM:
                 # Viterbi 알고리즘을 이용하여 가장 가능성 높은 상태 시퀀스를 계산
                 logprob, states = self.model.decode(emission_probs.reshape(-1,1), algorithm="viterbi")
 
-                return logprob, states
+                return logprob, np.array(states)
                 #return state_sequence
             else:
                 raise ValueError("Invalid observation data")
 
         except Exception as e:
             rospy.logerr(f"Prediction failed: {e}")
-            return None, []
+            return None, np.array([])
 
 ################      Vehicle Tracker     ##############
 class VehicleTracker():
@@ -128,7 +147,7 @@ class VehicleTracker():
 
         self.dt=dt
         self.T=T
-        self.v_max= 60.0 # Maximum Velocity :: Parameter Tunning
+        self.v_max= 50.0 # Maximum Velocity :: Parameter Tunning
         self.rate=rospy.Rate(30)
         self.lane_width=3.521 # initial value
 
@@ -181,30 +200,6 @@ class VehicleTracker():
         data = [obstacle.position.x, obstacle.position.y, radians(obstacle.heading), v, a, yaw_rate]
 
         return data
-
-
-    ########## Calculate b_ij probability using Gaussian Probability Distribution ########
-    def calculate_probability(self, d_lat, v, lane_width):
-        #b_ij : Certain Maneuver -> Observation Value, Not a state... This is continuous value
-        # For given d_lat, velocity -> Maneuver (필요 충분 조건이라고 가정)
-        # 입력값의 v와 d_lat은 각 object 차량의 d값과 속도값을 받아와야 함.
-        #TODO(3): Calculating Observation Probability
-        # P(A|C, M)
-        ## Lane Change Profile Probability
-        p_lcv = lambda d_lat, v : multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(d_lat-self.lane_width/2)**2+self.v_max),0.4) if d_lat > 0 else multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(d_lat+self.lane_width/2)**2+self.v_max), 0.4)
-        p_lcv_minus = lambda d_lat, v : multivariate_normal.pdf(v, (2/self.lane_width)**2*self.v_max*(d_lat+self.lane_width/2)**2-self.v_max,0.4) if d_lat < 0 else  multivariate_normal.pdf(v, (2/self.lane_width)**2*self.v_max*(d_lat-self.lane_width/2)**2-self.v_max, 0.4)
-
-        ## Lane Keeping Profile Probability
-        p_lkv = lambda x, v: multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(x)**2),0.4) if x > 0 else multivariate_normal.pdf(v, ((2/self.w)**2*self.v_max*(x)**2),0.4)
-
-        #P(M|C)
-        p_lk=norm.pdf(d_lat, 0, 0.4) # lk 확률
-        p_lc=norm.pdf(d_lat, lane_width/2, 0.4) # lc 확률
-        print("Possibility of p_lk ", p_lkv)
-        print("Possibility of left lane change" , p_lcv)
-        print("Possibility of right lane change", p_lcv_minus)
-
-        return p_lcv, p_lcv_minus, p_lkv, p_lk, p_lc
 
     ## MAIN PROGRAM ##
     def run(self):
@@ -267,7 +262,7 @@ class VehicleTracker():
                         frenet_point = ObjectFrenetPosition(unique_id = obj_id, s =s, d=d, speed= current_speed)
                         self.object_position_frenet.publish(frenet_point)
                         print("Frenet Point of Object", frenet_point)
-                        print("prediction message", predicted_list)
+                        # print("prediction message", predicted_list)
                         # Publish ROS TOPIC
                         self.state_prediction.publish(predicted_object)
                     else:
