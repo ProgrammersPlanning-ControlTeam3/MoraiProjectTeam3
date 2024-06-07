@@ -12,8 +12,8 @@ from math import sqrt, radians, pow
 from nav_msgs.msg import Odometry, Path
 from morai_msgs.msg import EgoVehicleStatus, ObjectStatus, ObjectStatusList, EventInfo
 from morai_msgs.srv import MoraiEventCmdSrv
-from std_msgs.msg import Int32
-from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM, ObjectFrenetPosition
+from std_msgs.msg import Int32, Header
+from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM, ObjectFrenetPosition, ManeuverProbability
 import scipy
 from scipy.stats import norm, multivariate_normal
 from filter import Extended_KalmanFilter, IMM_filter
@@ -90,8 +90,9 @@ class VehicleBehaviorHMM:
 
                 # Viterbi 알고리즘을 이용하여 가장 가능성 높은 상태 시퀀스를 계산
                 logprob, states = self.model.decode(emission_probs.reshape(-1,1), algorithm="viterbi")
-
-                return logprob, np.array(states)
+                state_probabilities = self.model.predict_proba(emission_probs) * 100
+                print(state_probabilities)
+                return logprob, np.array(states), state_probabilities
                 #return state_sequence
             else:
                 raise ValueError("Invalid observation data")
@@ -220,20 +221,25 @@ class VehicleTracker():
                     # Observations dictionary에 observation값 추가. time stamp관리?
                     # observations.append(observation)
                     #self.hmm_models[obj_id].fit([observations])
-                    logprob, state_sequence = self.hmm_models[obj_id].predict([observation])
-
+                    logprob, state_sequence , probability = self.hmm_models[obj_id].predict([observation])
+                    print("probability:::::::::::", probability)
                     if state_sequence.size>0:
                         predicted_state = self.hmm_models[obj_id].states[state_sequence[0]]
-                        probability = np.exp(logprob)
-                        predicted_object = PredictedHMM(unique_id = obj_id, maneuver=predicted_state, probability=probability)
-                        predicted_list.append(predicted_object)
-                        # prediction_msg = f"Object ID: {obj_id}, Predicted State: {predicted_state}, Probability: {probability:.4f}"
 
                         #position message of frenet point
                         frenet_point = ObjectFrenetPosition(unique_id = obj_id, s =s, d=d, speed= current_speed)
                         self.object_position_frenet.publish(frenet_point)
-                        print("Frenet Point of Object", frenet_point)
-                        # print("prediction message", predicted_list)
+                        predicted_object = PredictedHMM()
+                        predicted_object.header= Header(stamp=rospy.Time.now(), frame_id = "map")
+                        predicted_object.unique_id = obj_id
+                        predicted_object.maneuver = predicted_state
+                        predicted_object.probability = [ManeuverProbability(lane_keeping=p[0], right_change=p[1], left_change=p[2]) for p in probability]
+                        #predicted_object = PredictedHMM(unique_id = obj_id, maneuver=predicted_state, probability=probability)
+                        predicted_list.append(predicted_object)
+                        # prediction_msg = f"Object ID: {obj_id}, Predicted State: {predicted_state}, Probability: {probability:.4f}"
+
+                        #print("Frenet Point of Object", frenet_point)
+                        print("prediction message", predicted_list)
                         # Publish ROS TOPIC
                         self.state_prediction.publish(predicted_object)
                     else:
