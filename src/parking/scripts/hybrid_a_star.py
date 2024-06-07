@@ -5,6 +5,12 @@ import math
 import matplotlib.pyplot as plt
 import random
 import time
+import sys
+import os
+
+current_path = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(current_path)
+
 from dubins import Dubins
 from obstacle import Obstacle
 from map import map
@@ -344,7 +350,7 @@ def hybrid_a_star():
         read_pose.pose.orientation.w = 1
         out_path.poses.append(read_pose)
 
-    return out_path
+    return opt_path, out_path
 
 # for publishing Topic
 def get_hybrid_a_star_dubins_global_path():
@@ -370,6 +376,7 @@ def get_hybrid_a_star_dubins_global_path():
         dubins_x += path_x
         dubins_y += path_y
 
+    # print(dubins_x,dubins_y)
     dubins_waypoint = zip(dubins_x,dubins_y)
 
     out_path = Path()
@@ -383,8 +390,7 @@ def get_hybrid_a_star_dubins_global_path():
         read_pose.pose.position.y = path_y
         read_pose.pose.orientation.w = 1
         out_path.poses.append(read_pose)
-
-    return out_path
+    return dubins_waypoint, out_path
 
 if __name__ == "__main__":
     main()

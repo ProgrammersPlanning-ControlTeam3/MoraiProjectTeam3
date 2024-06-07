@@ -10,6 +10,8 @@ from morai_msgs.msg import EgoVehicleStatus
 from tf.transformations import euler_from_quaternion
 from frame_transform import get_frenet, get_cartesian, get_dist
 
+isArrived = False
+
 class PathPub:
     def __init__(self):
         rospy.init_node('path_pub', anonymous=True)
@@ -26,6 +28,7 @@ class PathPub:
         self.global_path_msg = Path()
         self.global_path_msg.header.frame_id = 'map'
 
+        #Parking Path
         self.global_path_parking_msg = Path()
         self.global_path_parking_msg.header.frame_id = 'map'
 
@@ -58,9 +61,8 @@ class PathPub:
     def global_path_callback(self, msg):
         self.global_path_msg = msg
 
-    def global_path_patking_callback(self, msg):
+    def global_path_parking_callback(self, msg):
         self.global_path_parking_msg = msg
-    
 
     def create_local_path_msg(self):
         local_path_msg = Path()

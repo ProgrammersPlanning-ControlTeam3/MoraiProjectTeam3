@@ -51,12 +51,12 @@ def object_status_callback(data):
             marker_pub.publish(marker)
     else :
         print("No parking obstacle detected!")
-    
 
 def main():
     rospy.init_node('parking_object_visualizer', anonymous=True)
 
     rospy.Subscriber("Object_topic", ObjectStatusList, object_status_callback)
+    # rospy.Subscriber("Goal", ObjectStatusList, goal_callback)
 
     global marker_pub
     marker_pub = rospy.Publisher("visualization_marker", Marker, queue_size=30)
