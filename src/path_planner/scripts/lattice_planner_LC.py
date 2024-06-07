@@ -13,6 +13,8 @@ from std_msgs.msg import Int32
 import numpy as np
 from frame_transform import *   
 
+isInParkingLot= False
+
 class latticePlanner:
     def __init__(self):
         rospy.init_node(name='lattice_planner', anonymous=True)
@@ -45,7 +47,7 @@ class latticePlanner:
         rate = rospy.Rate(30)  # 30hz
         while not rospy.is_shutdown():
             if self.is_path and self.is_status and self.is_obj:
-                
+    
                 self.foward_vehicle_speed = self.get_forward_vehicle(self.local_path, self.object_data)
                 lattice_path = self.latticePlanner(self.local_path, self.x, self.y)
                 lattice_path_index = self.collision_check(self.object_data, self.object_path, lattice_path)
@@ -76,7 +78,7 @@ class latticePlanner:
         for local_pose in local_path:
             for npc in object_data.npc_list:
                 local_npc_position = self.transform_to_local(npc.position, forward_vehicle, forward_theta)
-                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1.75:
+                if 0 < (local_npc_position.x - local_pose.x) < 50 and abs(local_npc_position.y - local_pose.y) < 1.75:
                     # print("Vehicle ahead : ", local_npc_position.x - local_pose.x)
                     # print(npc.velocity.x)
                     return npc.velocity.x
@@ -148,7 +150,7 @@ class latticePlanner:
         # 생성된 충돌 회피 경로 중 낮은 비용의 경로 선택
 
         selected_lane = -1
-        lane_weight = [15, 5, 0, 500, 15, 5, 0, 500]  # reference path
+        lane_weight = [15, 3, 0, 500, 15, 3, 0, 500]  # reference path
 
         # path_size = 50
 
@@ -207,9 +209,9 @@ class latticePlanner:
                             for predicted_pose in predicted_path.path:
                                 if is_path_overlap(path_pos, predicted_pose, 2.35):
                                     if path_num < 4:
-                                        lane_weight[path_num] += 5
+                                        lane_weight[path_num] += 15
                                     else:
-                                        lane_weight[path_num] += 3
+                                        lane_weight[path_num] += 10
 
         selected_lane = lane_weight.index(min(lane_weight))
         # print("Lane change : ", selected_lane)
@@ -279,8 +281,8 @@ class latticePlanner:
 
         look_distance = int(vehicle_velocity * 0.2 * 2)
 
-        if look_distance < 14:
-            look_distance = 14
+        if look_distance < 20:
+            look_distance = 20
 
         # ref_path.poses의 길이를 고려하여 look_distance 조정
         max_look_distance = len(ref_path.poses) // 2 - 1
