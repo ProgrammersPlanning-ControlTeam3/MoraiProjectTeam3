@@ -1,296 +1,281 @@
 #!/usr/bin/env python3
-# coding: utf-8
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '../msg'))
-sys.path.insert(0, '/home/henricus/final_project/src')
-import numpy as np
-import time
+# -*- coding: utf-8 -*-
+
 import rospy
-from geometry_msgs.msg import Point
-from math import sqrt, radians, pow
-from nav_msgs.msg import Odometry, Path
-from morai_msgs.msg import EgoVehicleStatus, ObjectStatus, ObjectStatusList, EventInfo
-from morai_msgs.srv import MoraiEventCmdSrv
-from std_msgs.msg import Int32
-from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList
-import scipy
-from scipy.stats import norm, multivariate_normal
-from filter import Extended_KalmanFilter, IMM_filter
+from math import sin, cos, atan2, sqrt, pi
 import numpy as np
-from hmmlearn import hmm
-
-from model import CTRA, CA
-
-# This is the physics based Model.
-# But we only need to decide the... Decision Based Model
-class DynamicObstacleTracker:
-  def __init__(self, dt=0.1, T=1):
-        mat_trans = np.array([[0.85, 0.15],
-                              [0.15, 0.85]])
-
-        mu = [0.8, 0.2]
-
-        self.dt = dt
-        self.T = T
-
-        self.filters = [Extended_KalmanFilter(5, 4),
-                        Extended_KalmanFilter(6, 4)]
-
-        self.models = [CA(self.dt), CTRA(self.dt)]
-
-        self.Q_list = [[0.5, 0.5, 0.5, 0.5, 0.05],
-                       [0.5, 0.5, 0.5, 0.5, 0.05, 0.01]] # process noise, Should fix, I just copied
-
-        for i in range(len(self.filters)):
-            self.filters[i].F = self.models[i].step
-            self.filters[i].H = self.models[i].H
-            self.filters[i].JA = self.models[i].JA
-            self.filters[i].JH = self.models[i].JH
-            self.filters[i].Q = np.diag(self.Q_list[i])
-            self.filters[i].R = np.diag([0.05, 0.05, 0.05, 0.05]) # measurement noise
-        # IMM filter 예측
-        self.IMM = IMM_filter(self.filters, mu, mat_trans)
-        self.MM = [mu]
-        self.X = [] # Solution
-
-  def initialize(self, data):
-    x=[np.array([data[0], data[1], data[3], 0, data[2]]),
-                np.array([data[0], data[1], data[3], 0, data[2], 0])]
-    for i in range(len(self.filters)):
-      self.filters[i].x=x[i]
-
-    self.X.append(x[1])
-
-  def update(self, data):
-    z=[data[0], data[1], data[3], data[2]]
-    self.IMM.prediction()
-    self.IMM.merging(z)
-
-    while len(self.MM) > int(self.T/self.dt):
-      self.MM.pop(0)
-    while len(self.X) > int(self.T/self.dt):
-      self.X.pop(0)
-
-    self.MM.append(self.IMM.mu.copy())
-    self.X.append(self.IMM.x.copy())
-
-    # 예측 코드 구현
-  def predict(self):
-    traj = self.IMM.predict(self.T)
-    return traj
+from tf.transformations import euler_from_quaternion
+from geometry_msgs.msg import Point
+from nav_msgs.msg import Odometry, Path
+from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
+import matplotlib.pyplot as plt
+import time
 
 
-class MultiDynamicObstacleTracker:
-    def __init__(self, dt=0.1, T=1, timeout=1.5):
-        self.trackers = {} # 트랙커 배열 정의
-        self.dt = dt # 관측 시간 정의
-        self.T = T # 토털 시간 정의
-        self.timeout = timeout  # Object Timeout (seconds)
-        self.deleted_ids=set()
-
-    def add_tracker(self, obj_id):
-        if obj_id not in self.trackers.keys():
-            self.trackers[obj_id] = {
-                'tracker': DynamicObstacleTracker(dt=self.dt, T=self.T), # 추적 정보
-                'last_update_time': rospy.Time.now()  # Initialize the last time that object updated
-            }
-
-    def initialize(self, obj_id, data):
-        if obj_id in self.trackers.keys():
-            self.trackers[obj_id]['tracker'].initialize(data)
-            self.trackers[obj_id]['last_update_time'] = rospy.Time.now()  # 업데이트된 시간 갱신
-        else:
-            self.add_tracker(obj_id)
-            self.trackers[obj_id]['tracker'].initialize(data)
-            self.trackers[obj_id]['last_update_time'] = rospy.Time.now()  # 업데이트된 시간 갱신
-
-    def get_deleted_ids(self):
-        deleted_ids = list(self.deleted_ids)
-        self.deleted_ids.clear()
-        return deleted_ids
-
-    def clean(self):
-        current_time = rospy.Time.now()
-        to_delete = []
-        time_duration=rospy.Duration(self.timeout)
-        for obj_id in self.trackers.keys():
-            rospy.loginfo(f"Timeout Duration: {rospy.Duration(self.timeout)}")
-            rospy.loginfo(f"Current Time: {current_time}")
-            rospy.loginfo(f"Last Update Time: {self.trackers[obj_id]['last_update_time']}")
-            if current_time - self.trackers[obj_id]['last_update_time'] > time_duration:
-                to_delete.append(obj_id)  # 타임아웃된 객체
-
-        for obj_id in to_delete:
-            self.delete(obj_id) # 타임아웃된 객체 삭제
-
-    # 오브젝트 관리
-    def delete(self, obj_id):
-        if obj_id in self.trackers.keys():
-            del self.trackers[obj_id]
-        else:
-            print(f"obj_id")
-
-    def update(self, obj_id, data):
-        if obj_id in self.trackers.keys():
-            current_time = rospy.Time.now()  # 현재 시간
-            if current_time - self.trackers[obj_id]['last_update_time'] > rospy.Duration(self.timeout):
-                self.delete(obj_id)  # 타임아웃된 객체 삭제
-                pass
-
-            self.trackers[obj_id]['tracker'].update(data)
-            self.trackers[obj_id]['last_update_time'] = rospy.Time.now()  # 업데이트된 시간 갱신
-        else:
-            self.initialize(obj_id, data)
-
-    def predict(self):
-        trajs = {}
-        for obj_id in self.trackers.keys():
-            trajs[obj_id] = self.trackers[obj_id]['tracker'].predict()
-
-        if len(trajs) == 0:
-            return None
-        else:
-            return trajs
-
-
-class DynamicObstacleTrackerNode:
+class pid_feedforward:
     def __init__(self):
-        rospy.init_node("dynamic_obstacle_tracker_node", anonymous=True)
-        rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_info_callback)
-        self.object_pose_pub = rospy.Publisher('/Object_topic/tracked_object_pose_topic', TrackedObjectPoseList, queue_size=10)
-        self.object_path_pub = rospy.Publisher('/Object_topic/tracked_object_path_topic', PredictedObjectPathList, queue_size=10)
-        self.deleted_id_pub = rospy.Publisher('/Object_topic/deleted_object_id', Int32, queue_size=10)
-        self.tracker = MultiDynamicObstacleTracker(dt=0.1, T=0.5, timeout=0.5)
+        rospy.Subscriber("/global_path", Path, self.global_path_callback)
+        rospy.Subscriber("/lattice_path", Path, self.path_callback)
+        rospy.Subscriber("/odom", Odometry, self.odom_callback)
+        rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
+        rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_callback)
 
-        self.rate = rospy.Rate(30)
-        self.is_object = False
-        self.object_data = None
-        self.previous_heading = {}
-        self.previous_time = rospy.Time.now()
+        self.is_path = False
+        self.is_odom = False
+        self.is_status = False
+        self.is_global_path = False
 
-    def object_info_callback(self, msg):
-        rospy.loginfo("Received Message")
-        self.is_object=True
+        self.forward_point = Point()
+        self.current_postion = Point()
+
+        self.vehicle_length = 5.205  # Hyundai Ioniq (hev)
+        self.target_velocity = 40
+
+        self.dt = 0.05
+        self.Kp = 0.001
+        self.Kd = 0.001
+        self.Ki = 0.001
+        self.kff = 0.001
+        self.error = 0.0
+        self.error_prev = self.error
+        self.error_d = 0.0
+        self.error_i = 0.0
+        self.max_delta_error = 3.0
+        self.u = 0
+        self.feedforwardterm = 0
+        self.coeff = None
+
+        self.path = None
+        self.x_ego = []
+        self.y_ego = []
+        self.start_time = None
+        self.end_time = None
+        self.errors = []
+
+        self.lookahead_distance = 20  # Lookahead distance 설정
+
+    def global_path_callback(self, msg):
+        self.global_path = msg
+        self.is_global_path = True
+
+    def object_callback(self, msg):
+        self.is_obj = True
         self.object_data = msg
 
-    def data_preprocessing(self, obstacle, delta_time):
-        obj_id = obstacle.unique_id
+    def path_callback(self, msg):
+        self.is_path = True
+        self.path = msg
 
-        # Calculating Velocity
-        v = sqrt(pow(obstacle.velocity.x, 2) + pow(obstacle.velocity.y, 2))
+        x = []
+        y = []
 
-        # Calculating ACC
-        a = sqrt(pow(obstacle.acceleration.x, 2) + pow(obstacle.acceleration.y, 2))
+        for pose in msg.poses:
+            global_position = pose.pose.position
+            local_position = self.transform_to_local(global_position, self.current_postion, self.vehicle_yaw)
+            x.append(local_position.x)
+            y.append(local_position.y)
 
-        # 이전 heading과 비교하여 yaw rate 계산
-        if obj_id in self.previous_heading:
-            previous_heading = self.previous_heading[obj_id]
-            yaw_rate = (radians(obstacle.heading) - previous_heading) / delta_time
+        if len(x) > 3:
+            self.coeff = np.polyfit(x, y, 3)
+            self.coeff = self.coeff[::-1].reshape(-1, 1)
         else:
-            yaw_rate = 0
+            self.coeff = None
 
-        data = [obstacle.position.x, obstacle.position.y, radians(obstacle.heading), v, a, yaw_rate]
+    def odom_callback(self, msg):
+        self.is_odom = True
+        odom_quaternion = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z,
+                           msg.pose.pose.orientation.w)
+        _, _, self.vehicle_yaw = euler_from_quaternion(odom_quaternion)
+        self.current_postion.x = msg.pose.pose.position.x
+        self.current_postion.y = msg.pose.pose.position.y
+        self.x_ego.append(self.current_postion.x)
+        self.y_ego.append(self.current_postion.y)
 
-        return data
+        if self.start_time is None:
+            self.start_time = time.time()
 
-    def publish_object_pose(self):
-        pose_list = TrackedObjectPoseList()
-        pose_list.header.stamp = rospy.Time.now()
-
-        for obj_id in self.tracker.trackers.keys():
-            # [x, y, v, a, theta, theta_rate]
-            x = self.tracker.trackers[obj_id]['tracker'].X[-1]
-            print("Current state X:", x)
-            # pose 정의, 메세지 타입은 TrackdPoint에서 x, y, v, a, theta(yaw), theta_rate(yaw_rate)로 정의
-            # 이를 바탕으로 TrackedObjectPose 정의, 이를 다시 pose에 정의. pose list 반환
-            pose = TrackedObjectPose(unique_id=obj_id, pose=TrackedPoint(x=x[0], y=x[1], v=x[2], a=x[3], theta=x[4], theta_rate=x[5]))
-            pose_list.pose_list.append(pose)
-
-        self.object_pose_pub.publish(pose_list)
-
-    def publish_object_path(self):
-        trajs = self.tracker.predict()
-        if trajs is None:
-            rospy.loginfo("No trajectories available to publish")
-            return
-
-        path_list = PredictedObjectPathList()
-        path_list.header.stamp = rospy.Time.now()
-
-        for obj_id in trajs.keys():
-            path = PredictedObjectPath()
-            path.unique_id = obj_id
-            for point in trajs[obj_id]:
-                # [x, y, v, a, theta, theta_rate]
-                pose = TrackedPoint(x=point[0], y=point[1], v=point[2], a=point[3], theta=point[4], theta_rate=point[5])
-                path.path.append(pose)
-
-            path_list.path_list.append(path)
-            rospy.loginfo("Publishing path for object ID: {}".format(obj_id))
+    def status_callback(self, msg):
+        self.is_status = True
+        self.status_msg = msg
 
 
-        self.object_path_pub.publish(path_list)
-        rospy.loginfo("Path data published")
-    def publish_deleted_ids(self):
-        deleted_ids = self.tracker.get_deleted_ids()
-        for deleted_id in deleted_ids:
-            self.deleted_id_pub.publish(deleted_id)
-            del self.previous_heading[deleted_id]
+    def transform_to_local(self, global_position, reference_position, reference_theta):
+        # 글로벌 좌표를 로컬 좌표로 변환
+        translation = np.array([global_position.x - reference_position.x,
+                                global_position.y - reference_position.y])
+        rotation_matrix = np.array([[cos(reference_theta), sin(reference_theta)],
+                                    [-sin(reference_theta), cos(reference_theta)]])
+        local_position = rotation_matrix.dot(translation)
+        return Point(x=local_position[0], y=local_position[1], z=0)
 
-    def run(self):
-        while not rospy.is_shutdown():
-            if self.is_object == True :
-                current_time = rospy.Time.now() #타임 객체
-                delta_time = (current_time - self.previous_time).to_sec()
+    def compute_cte(self):
+        if self.path is None or not self.path.poses:
+            return 0.0
 
-                for obstacle in self.object_data.npc_list:
-                    obj_id = obstacle.unique_id
-                    data = self.data_preprocessing(obstacle, delta_time)
+        min_dist = float('inf')
+        closest_idx = 0
 
-                    self.tracker.update(obj_id, data)
+        # 현재 위치에서 가장 가까운 점 찾기
+        for i, pose in enumerate(self.path.poses):
+            global_position = pose.pose.position
+            local_position = self.transform_to_local(global_position, self.current_postion, self.vehicle_yaw)
 
-                    self.previous_heading[obj_id] = radians(obstacle.heading)
+            dist = sqrt(local_position.x**2 + local_position.y**2)
+            if dist < min_dist:
+                min_dist = dist
+                closest_idx = i
 
-                self.previous_time = current_time # 타임 객체
+        lookahead_idx = closest_idx
 
-                self.tracker.clean()
-                self.publish_deleted_ids()
-                self.publish_object_pose()
-                self.publish_object_path()
+        if self.is_obstacle_nearby():
+            # Lookahead distance를 정확히 반영하여 다음 지점 선택
+            for i in range(closest_idx, len(self.path.poses)):
+                global_position = self.path.poses[i].pose.position
+                local_position = self.transform_to_local(global_position, self.current_postion, self.vehicle_yaw)
+                lookahead_dist = sqrt(local_position.x**2 + local_position.y**2)
+                if lookahead_dist >= self.lookahead_distance:
+                    lookahead_idx = i
+                    break
 
-            self.rate.sleep()
+        if lookahead_idx == closest_idx:
+            lookahead_idx = min(lookahead_idx + 1, len(self.path.poses) - 1)
 
-class DynamicObstacleTrackerHMM:
-    def __init__(self):
-        rospy.init_node("dynamic_obstacle_tracker_node", anonymous=True)
-        rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_info_callback)
-        self.object_pose_pub = rospy.Publisher('/Object_topic/tracked_object_pose_topic', TrackedObjectPoseList, queue_size=10)
-        self.object_path_pub = rospy.Publisher('/Object_topic/tracked_object_path_topic', PredictedObjectPathList, queue_size=10)
-        self.deleted_id_pub = rospy.Publisher('/Object_topic/deleted_object_id', Int32, queue_size=10)
-        self.rate = rospy.Rate(30)
-        self.is_object = False
-        self.object_data = None
-        self.previous_heading = {}
-        self.previous_time=rospy.Time.now()
+        # Lookahead point에서의 횡방향 거리 계산
+        lookahead_point = self.path.poses[lookahead_idx].pose.position
+        lookahead_local = self.transform_to_local(lookahead_point, self.current_postion, self.vehicle_yaw)
 
-        self.model=hmm.GaussianHMM(n_components=2, covariance_type="diag", n_iter=1000)
-        self.states=['Lane Keeping', 'Lane Changing']
+        cte = lookahead_local.y  # 횡방향 거리만 사용하여 CTE 계산
 
-    def train_hmm(self, data, lengths):
-        self.model.fit(data, lengths)
+        if abs(cte) < 100:
+            self.errors.append(abs(cte))
 
-    def predict_hmm(self, data):
-        hidden_states=self.model.predict(data.reshape(-1,1))
-        return hidden_states
+        return cte
 
-    def object_info_callback(self, msg):
-        self.is_object=True
-        self.object_data=msg
+    def calc_pid_feedforward(self):
+        if not self.is_path or not self.is_odom or not self.is_status:
+            return 0.0
 
-if __name__ == '__main__':
-    try:
-        tracker = DynamicObstacleTrackerNode()
-        tracker.run()
-    except rospy.ROSInterruptException:
-        pass
+        cte = self.compute_cte()
+        if self.coeff is None:
+            return 0.0
+        print(cte)
+        max_cte = 10.0
+        cte = np.clip(cte, -max_cte, max_cte)
+
+        if abs(cte) > 0.2:
+            self.Kp = 0.05
+            self.Kd = 0.03
+            self.Ki = 0.001
+            self.kff = 0.001
+        else:
+            self.Kp = 0.01
+            self.Kd = 0.05
+            self.Ki = 0.005
+            self.kff = 0.01
+
+        self.error = cte
+
+        self.error_d = (self.error - self.error_prev) / self.dt
+        self.error_i = self.error_i + self.error * self.dt
+        self.feedforwardterm = self.status_msg.velocity.x**2 * 2 * self.coeff[-3][0]
+
+        self.u = self.Kp * self.error + self.Kd * self.error_d + self.Ki * self.error_i + self.kff * self.feedforwardterm
+
+        # # 조향각 제한 설정 (필요 시)
+        # max_steering_rate = pi / 45
+        # if abs(self.u - self.error_prev) > max_steering_rate:
+        #     if self.u > self.error_prev:
+        #         self.u = self.error_prev + max_steering_rate
+        #     else:
+        #         self.u = self.error_prev - max_steering_rate
+
+        self.error_prev = self.error
+
+        return self.u
+
+
+
+    def is_obstacle_nearby(self):
+        if not self.is_obj:
+            return False
+
+        for obj in self.object_data.npc_list:
+            local_position = self.transform_to_local(obj.position, self.current_postion, self.vehicle_yaw)
+            distance = sqrt(local_position.x**2 + local_position.y**2)
+            if distance < 40 and local_position.x > -15 and abs(local_position.y) < 5 :
+                return True
+        return False
+
+
+    def get_current_waypoint(self, ego_status, global_path):
+        min_dist = float('inf')
+        current_waypoint = -1
+        for i, pose in enumerate(global_path.poses):
+            dx = ego_status.position.x - pose.pose.position.x
+            dy = ego_status.position.y - pose.pose.position.y
+
+            dist = sqrt(pow(dx, 2) + pow(dy, 2))
+            if min_dist > dist:
+                min_dist = dist
+                current_waypoint = i
+        return current_waypoint
+
+    def calculate_statistics(self):
+        if len(self.errors) > 0:
+            mean_error = np.mean(self.errors)
+            max_error = np.max(self.errors)
+            variance = np.var(self.errors)
+            return mean_error, max_error, variance
+        return 0.0, 0.0, 0.0
+
+    def calculate_total_time(self):
+        if self.start_time is not None and self.end_time is not None:
+            return self.end_time - self.start_time
+        elif self.start_time is not None:
+            return time.time() - self.start_time
+        return 0.0
+
+    def set_end_time(self):
+        if self.end_time is None:
+            self.end_time = time.time()
+
+def plot_paths(global_path, x_ego, y_ego, total_time, variance, mean_error, max_error):
+    if global_path is None:
+        return
+
+    x_global = [pose.pose.position.x for pose in global_path.poses]
+    y_global = [pose.pose.position.y for pose in global_path.poses]
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(x_global, y_global, 'k--', label='Global Path')
+    plt.plot(x_ego, y_ego, 'b-', label='Ego Vehicle Path')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.legend(loc="best")
+    plt.title('Vehicle Path Tracking')
+    plt.grid(True)
+
+    plt.text(0.95, 0.05, f'Total Time: {total_time:.2f}s\nVariance: {variance:.4f}\nMean Error: {mean_error:.4f}\nMax Error: {max_error:.4f}', 
+             horizontalalignment='right',
+             verticalalignment='bottom',
+             transform=plt.gca().transAxes)
+
+    plt.show()
+
+# if __name__ == "__main__":
+#     rospy.init_node('path_tracking_node', anonymous=True)
+
+#     pid_controller = pid_feedforward()
+
+#     rate = rospy.Rate(10)  # 10 Hz
+#     while not rospy.is_shutdown():
+#         if pid_controller.is_path and pid_controller.is_odom and pid_controller.is_status:
+#             steering = pid_controller.calc_pid_feedforward()
+#         rate.sleep()
+
+#     pid_controller.set_end_time()
+
+#     if pid_controller.global_path is not None:
+#         mean_error, max_error, variance = pid_controller.calculate_statistics()
+#         plot_paths(pid_controller.global_path, pid_controller.x_ego, pid_controller.y_ego,
+#                    pid_controller.calculate_total_time(), variance, mean_error, max_error)
