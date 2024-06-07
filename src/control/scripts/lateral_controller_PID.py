@@ -31,11 +31,11 @@ class pid_feedforward:
         self.vehicle_length = 5.205  # Hyundai Ioniq (hev)
         self.target_velocity = 40
 
-        self.dt = 0.01
-        self.Kp = 0.05
-        self.Kd = 0.02
+        self.dt = 0.05
+        self.Kp = 0.001
+        self.Kd = 0.001
         self.Ki = 0.001
-        self.kff = 0.005
+        self.kff = 0.001
         self.error = 0.0
         self.error_prev = self.error
         self.error_d = 0.0
@@ -52,7 +52,7 @@ class pid_feedforward:
         self.end_time = None
         self.errors = []
 
-        self.lookahead_distance = 10  # Lookahead distance 설정
+        self.lookahead_distance = 20
 
     def global_path_callback(self, msg):
         self.global_path = msg
@@ -102,21 +102,18 @@ class pid_feedforward:
     def transform_to_local(self, global_position, reference_position, reference_theta):
         translation = np.array([global_position.x - reference_position.x,
                                 global_position.y - reference_position.y])
-        rotation_matrix = np.array([[cos(-reference_theta), -sin(-reference_theta)],
-                                    [sin(-reference_theta), cos(-reference_theta)]])
+        rotation_matrix = np.array([[cos(reference_theta), sin(reference_theta)],
+                                    [-sin(reference_theta), cos(reference_theta)]])
         local_position = rotation_matrix.dot(translation)
         return Point(x=local_position[0], y=local_position[1], z=0)
-
 
     def compute_cte(self):
         if self.path is None or not self.path.poses:
             return 0.0
 
         min_dist = float('inf')
-        closest_point = None
         closest_idx = 0
 
-        # 현재 위치에서 가장 가까운 점 찾기
         for i, pose in enumerate(self.path.poses):
             global_position = pose.pose.position
             local_position = self.transform_to_local(global_position, self.current_postion, self.vehicle_yaw)
@@ -124,35 +121,31 @@ class pid_feedforward:
             dist = sqrt(local_position.x**2 + local_position.y**2)
             if dist < min_dist:
                 min_dist = dist
-                closest_point = local_position
                 closest_idx = i
 
-        if closest_point is None:
-            return 0.0
-
-        next_point = None
-        lookahead_dist = 0.0
-
-        next_point = closest_point
+        lookahead_idx = closest_idx
 
         if self.is_obstacle_nearby():
-            # Lookahead distance를 정확히 반영하여 다음 지점 선택
             for i in range(closest_idx, len(self.path.poses)):
                 global_position = self.path.poses[i].pose.position
                 local_position = self.transform_to_local(global_position, self.current_postion, self.vehicle_yaw)
                 lookahead_dist = sqrt(local_position.x**2 + local_position.y**2)
                 if lookahead_dist >= self.lookahead_distance:
-                    next_point = local_position
+                    lookahead_idx = i
                     break
 
-        # Lookahead point에서의 횡방향 거리 계산
-        cte = next_point.y  # 횡방향 거리만 사용하여 CTE 계산
+        if lookahead_idx == closest_idx:
+            lookahead_idx = min(lookahead_idx + 1, len(self.path.poses) - 1)
+
+        lookahead_point = self.path.poses[lookahead_idx].pose.position
+        lookahead_local = self.transform_to_local(lookahead_point, self.current_postion, self.vehicle_yaw)
+
+        cte = lookahead_local.y
 
         if abs(cte) < 100:
             self.errors.append(abs(cte))
 
         return cte
-
 
     def calc_pid_feedforward(self):
         if not self.is_path or not self.is_odom or not self.is_status:
@@ -161,26 +154,21 @@ class pid_feedforward:
         cte = self.compute_cte()
         if self.coeff is None:
             return 0.0
-
         max_cte = 10.0
         cte = np.clip(cte, -max_cte, max_cte)
 
-        check_value = False
-
-        if abs(cte) > 1.0:
-            self.Kp = 0.8
-            self.Kd = 0.5
-            self.Ki = 0.000
-            self.kff = 0.000
-            check_value = True
-        else:
-            self.Kp = 0.05
-            self.Kd = 0.02
+        if abs(cte) > 0.2:
+            self.Kp = 0.005
+            self.Kd = 0.005
             self.Ki = 0.001
-            self.kff = 0.005
+            self.kff = 0.001
+        else:
+            self.Kp = 0.01
+            self.Kd = 0.01
+            self.Ki = 0.005
+            self.kff = 0.01
 
         self.error = cte
-        print(cte)
 
         self.error_d = (self.error - self.error_prev) / self.dt
         self.error_i = self.error_i + self.error * self.dt
@@ -188,25 +176,23 @@ class pid_feedforward:
 
         self.u = self.Kp * self.error + self.Kd * self.error_d + self.Ki * self.error_i + self.kff * self.feedforwardterm
 
-        if abs(cte) <= 1.0:
-            max_steering_rate = pi / 45
-            if abs(self.u - self.error_prev) > max_steering_rate:
+        if abs(cte) > 0.2:
+            # 조향각 제한 설정 (필요 시)
+            max_steering_rate = pi / 3600
+
+            if abs(self.u - self.error_prev) > 0.5:
                 if self.u > self.error_prev:
                     self.u = self.error_prev + max_steering_rate
                 else:
                     self.u = self.error_prev - max_steering_rate
-
-        # if check_value:
-        #     print(self.Kp * self.error)
-        #     print(self.Kd * self.error_d)
-        #     print(self.Ki * self.error_i)
-        #     print(self.kff * self.feedforwardterm)
-        #     print(self.Kp * self.error + self.Kd * self.error_d + self.Ki * self.error_i + self.kff * self.feedforwardterm)
-        #     print (self.u, "\n")
-
+            print(self.u)
         self.error_prev = self.error
 
+        max_steering_angle = pi / 10
+        self.u = np.clip(self.u, -max_steering_angle, max_steering_angle)
+
         return self.u
+
 
 
     def is_obstacle_nearby(self):
@@ -216,7 +202,7 @@ class pid_feedforward:
         for obj in self.object_data.npc_list:
             local_position = self.transform_to_local(obj.position, self.current_postion, self.vehicle_yaw)
             distance = sqrt(local_position.x**2 + local_position.y**2)
-            if distance < 30 and local_position.x > -15 and abs(local_position.y) < 5 :
+            if distance < 40 and local_position.x > -15 and abs(local_position.y) < 5 :
                 return True
         return False
 
@@ -276,20 +262,20 @@ def plot_paths(global_path, x_ego, y_ego, total_time, variance, mean_error, max_
 
     plt.show()
 
-if __name__ == "__main__":
-    rospy.init_node('path_tracking_node', anonymous=True)
+# if __name__ == "__main__":
+#     rospy.init_node('path_tracking_node', anonymous=True)
 
-    pid_controller = pid_feedforward()
+#     pid_controller = pid_feedforward()
 
-    rate = rospy.Rate(10)  # 10 Hz
-    while not rospy.is_shutdown():
-        if pid_controller.is_path and pid_controller.is_odom and pid_controller.is_status:
-            steering = pid_controller.calc_pid_feedforward()
-        rate.sleep()
+#     rate = rospy.Rate(10)  # 10 Hz
+#     while not rospy.is_shutdown():
+#         if pid_controller.is_path and pid_controller.is_odom and pid_controller.is_status:
+#             steering = pid_controller.calc_pid_feedforward()
+#         rate.sleep()
 
-    pid_controller.set_end_time()
+#     pid_controller.set_end_time()
 
-    if pid_controller.global_path is not None:
-        mean_error, max_error, variance = pid_controller.calculate_statistics()
-        plot_paths(pid_controller.global_path, pid_controller.x_ego, pid_controller.y_ego,
-                   pid_controller.calculate_total_time(), variance, mean_error, max_error)
+#     if pid_controller.global_path is not None:
+#         mean_error, max_error, variance = pid_controller.calculate_statistics()
+#         plot_paths(pid_controller.global_path, pid_controller.x_ego, pid_controller.y_ego,
+#                    pid_controller.calculate_total_time(), variance, mean_error, max_error)
