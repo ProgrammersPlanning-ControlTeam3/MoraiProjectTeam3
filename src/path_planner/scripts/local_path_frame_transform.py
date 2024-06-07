@@ -17,10 +17,18 @@ class PathPub:
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
 
+        #parking_path Sub
+        rospy.Subscriber("/global_path_parking", Path, self.global_path_callback)
+
+
         self.local_path_pub = rospy.Publisher('/local_path', Path, queue_size=1)
 
         self.global_path_msg = Path()
         self.global_path_msg.header.frame_id = 'map'
+
+        self.global_path_parking_msg = Path()
+        self.global_path_parking_msg.header.frame_id = 'map'
+
 
         self.is_status = False
         self.local_path_size = 30
@@ -49,6 +57,10 @@ class PathPub:
 
     def global_path_callback(self, msg):
         self.global_path_msg = msg
+
+    def global_path_patking_callback(self, msg):
+        self.global_path_parking_msg = msg
+    
 
     def create_local_path_msg(self):
         local_path_msg = Path()

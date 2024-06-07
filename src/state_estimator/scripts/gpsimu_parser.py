@@ -33,10 +33,7 @@ class GPSIMUParser:
         while not rospy.is_shutdown():
             if self.is_imu==True and self.is_gps == True:
                 self.convertLL2UTM()
-
                 self.odom_pub.publish(self.odom_msg)
-
-
                 rate.sleep()
 
     def navsat_callback(self, gps_msg):
