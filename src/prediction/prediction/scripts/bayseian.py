@@ -12,8 +12,8 @@ from math import sqrt, radians, pow
 from nav_msgs.msg import Odometry, Path
 from morai_msgs.msg import EgoVehicleStatus, ObjectStatus, ObjectStatusList, EventInfo
 from morai_msgs.srv import MoraiEventCmdSrv
-from std_msgs.msg import Int32
-from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM, ObjectFrenetPosition
+from std_msgs.msg import Int32, Header
+from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM, ObjectFrenetPosition, ManeuverProbability
 import scipy
 from scipy.stats import norm, multivariate_normal
 from filter import Extended_KalmanFilter, IMM_filter
@@ -52,60 +52,32 @@ class VehicleBehaviorHMM:
         self.model.transmat_ = self.transition_matrix
 
         # Covariance
-        self.model.covars_ = np.full((self.n_states, 1,1), 0.01)
+        self.model.covars_ = np.full((self.n_states, 1,1), 0.4)
 
         # MEANS
+        # 3x2 Vector 형태가 되어야 한다. Velocity에 대한 의존값으로 바꾸자. 대신 Velocity가 d_lat에 의존한다고 하자. 종속성 가정
         self.model.means_ = np.zeros((self.n_states, 1))
 
-    def calculate_emission_probabilities(self, d_lat, v):
-        # Lane Change Profile Probability
-        p_lcv = lambda d_lat, v : multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(d_lat-self.lane_width/2)**2+self.v_max),0.4) if d_lat > 0 else multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(d_lat+self.lane_width/2)**2+self.v_max), 0.4)
-        p_lcv_minus = lambda d_lat, v : multivariate_normal.pdf(v, (2/self.lane_width)**2*self.v_max*(d_lat+self.lane_width/2)**2-self.v_max,0.4) if d_lat < 0 else  multivariate_normal.pdf(v, (2/self.lane_width)**2*self.v_max*(d_lat-self.lane_width/2)**2-self.v_max, 0.4)
+    def calculate_mean(self, d_lat, v):
+        llc_mean = -(2/self.lane_width)**2*self.v_max*(d_lat-self.lane_width/2)**2+self.v_max # Right Change
+        lk_mean = -(2/self.lane_width)**2*self.v_max*(d_lat)**2
+        rlc_mean = (2/self.lane_width)**2*self.v_max*(d_lat+self.lane_width/2)**2-self.v_max
 
-        # Lane Keeping Profile Probability
-        p_lkv = lambda x, v: multivariate_normal.pdf(v, (-(2/self.lane_width)**2*self.v_max*(x)**2),0.4) if x > 0 else multivariate_normal.pdf(v, ((2/self.lane_width)**2*self.v_max*(x)**2),0.4)
+        print("lk mean, lc mean, rc mean : ", lk_mean, llc_mean, rlc_mean)
 
-        # Probability Normalization
-        ## 이거 추가하니까 안되는데.
-        p_lcv_val = p_lcv(d_lat, v)
-        p_lcv_minus_val = p_lcv_minus(d_lat, v)
-        p_lkv_val = p_lkv(d_lat, v)
-        print("Calculated probabilites: ", p_lkv_val, p_lcv_val, p_lcv_minus_val)
-
-        total_probability = p_lcv_val + p_lcv_minus_val + p_lkv_val
-        if total_probability > 0:
-            p_lcv_val /= total_probability
-            p_lcv_minus_val /= total_probability
-            p_lkv_val /= total_probability
-        else:
-            rospy.logwarn("Total probability is zero,,, error!!")
-
-        print("Possibility of p_lk ", p_lkv_val)
-        print("Possibility of left lane change" , p_lcv_val)
-        print("Possibility of right lane change", p_lcv_minus_val)
-
-        # 방출 확률 계산
-        emission_probabilities = np.array([
-            p_lkv_val,  # Lane Keeping
-            p_lcv_val,  # Right Lane Change
-            p_lcv_minus_val  # Left Lane Change
-        ])
-        print("Emission matrix", emission_probabilities)
-
-        return emission_probabilities
+        return lk_mean, rlc_mean, llc_mean
 
     def fit(self, observations):
         try:
             # 관측값 (d_lat, v) 시퀀스에서 방출 확률 계산
-            emission_probs = np.array([self.calculate_emission_probabilities(d_lat, v) for d_lat, v in observations])
-            if not emission_probs.size:
-                raise ValueError("Empty emission probabilities")
+            lane_keeping_mean, right_change_mean, left_change_mean = (self.calculate_mean(d_lat, v) for d_lat, v in observations)
             # HMM의 means와 covariances 설정 (방출 확률을 기준으로 함)
-            self.model.means_ = np.mean(emission_probs, axis=0).reshape(-1, 1)
-            #self.model.covars_ = np.var(emission_probs, axis=0).reshape(-1, 1, 1)
-            self.model.covars_ = np.array([np.diag(np.var(emission_probs, axis=0) + 0.0001)])
-            # 모델 적합
-            self.model.fit(emission_probs.reshape(-1,1))
+            # MEAN은 Gaussian 확률 분포를 가정한다.
+            # 평균과 공분산은 바뀌지 않는다. 가우시안값이라 ㅇㅋ?
+            self.model.means = np.array([lane_keeping_mean], [right_change_mean], [left_change_mean])
+            self.model.covars_ = np.full((self.n_states, 1,1), 0.4)
+            formatted_obs = np.column_stack([obs[0]] for obs in observations)
+            self.model.fit(formatted_obs.reshape(-1,1))
 
         except Exception as e:
             rospy.logerr(f"Failed to fit model: {e}")
@@ -114,13 +86,13 @@ class VehicleBehaviorHMM:
         try:
             if observations and all(isinstance(obs, tuple) and len(obs) ==2 for obs in observations):
                 # 관측값 (d_lat, v) 시퀀스에서 방출 확률 계산
-                emission_probs = np.array([self.calculate_emission_probabilities(d_lat, v) for d_lat, v in observations])
-                if emission_probs.size == 0:
-                    raise ValueError("No valid observation")
+                emission_probs = np.column_stack([obs[0] for obs in observations])
+
                 # Viterbi 알고리즘을 이용하여 가장 가능성 높은 상태 시퀀스를 계산
                 logprob, states = self.model.decode(emission_probs.reshape(-1,1), algorithm="viterbi")
-
-                return logprob, np.array(states)
+                state_probabilities = self.model.predict_proba(emission_probs) * 100
+                print(state_probabilities)
+                return logprob, np.array(states), state_probabilities
                 #return state_sequence
             else:
                 raise ValueError("Invalid observation data")
@@ -249,20 +221,25 @@ class VehicleTracker():
                     # Observations dictionary에 observation값 추가. time stamp관리?
                     # observations.append(observation)
                     #self.hmm_models[obj_id].fit([observations])
-                    logprob, state_sequence = self.hmm_models[obj_id].predict([observation])
-
+                    logprob, state_sequence , probability = self.hmm_models[obj_id].predict([observation])
+                    print("probability:::::::::::", probability)
                     if state_sequence.size>0:
                         predicted_state = self.hmm_models[obj_id].states[state_sequence[0]]
-                        probability = np.exp(logprob)
-                        predicted_object = PredictedHMM(unique_id = obj_id, maneuver=predicted_state, probability=probability)
-                        predicted_list.append(predicted_object)
-                        # prediction_msg = f"Object ID: {obj_id}, Predicted State: {predicted_state}, Probability: {probability:.4f}"
 
                         #position message of frenet point
                         frenet_point = ObjectFrenetPosition(unique_id = obj_id, s =s, d=d, speed= current_speed)
                         self.object_position_frenet.publish(frenet_point)
-                        print("Frenet Point of Object", frenet_point)
-                        # print("prediction message", predicted_list)
+                        predicted_object = PredictedHMM()
+                        predicted_object.header= Header(stamp=rospy.Time.now(), frame_id = "map")
+                        predicted_object.unique_id = obj_id
+                        predicted_object.maneuver = predicted_state
+                        predicted_object.probability = [ManeuverProbability(lane_keeping=p[0], right_change=p[1], left_change=p[2]) for p in probability]
+                        #predicted_object = PredictedHMM(unique_id = obj_id, maneuver=predicted_state, probability=probability)
+                        predicted_list.append(predicted_object)
+                        # prediction_msg = f"Object ID: {obj_id}, Predicted State: {predicted_state}, Probability: {probability:.4f}"
+
+                        #print("Frenet Point of Object", frenet_point)
+                        print("prediction message", predicted_list)
                         # Publish ROS TOPIC
                         self.state_prediction.publish(predicted_object)
                     else:

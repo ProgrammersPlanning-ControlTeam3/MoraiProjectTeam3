@@ -76,11 +76,11 @@ class HMMPredictionPath:
         # 경로 생성 시뮬레이션 범위
         x_range = np.linspace(current_x, current_x + 100, num=100)  # 100m 앞까지 예측
 
-        if predicted_state == "Right Change":
+        if predicted_state == "Right Lane Change":
             # 오른쪽 차선 변경
             end_y = current_y + lane_width
             coefficients = self.generate_polynomial_path((current_x, current_y, current_v), (current_x + 50, end_y, current_v))
-        elif predicted_state == "Left Change":
+        elif predicted_state == "Left Lane Change":
             # 왼쪽 차선 변경
             end_y = current_y - lane_width
             coefficients = self.generate_polynomial_path((current_x, current_y, current_v), (current_x + 50, end_y, current_v))
