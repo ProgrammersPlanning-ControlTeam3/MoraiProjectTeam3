@@ -63,10 +63,19 @@ class latticePlanner:
 
     # TODO : When Forward/Right/Left vehicle is nearby. Need to create function returning nearby vehicle
     def npc_intension(self, nearby_vehicle_idx):
-        if nearby_vehicle_idx == self.prediction_data.unique_id:
-            print(self.prediction_data.maneuver)
-            print(self.prediction_data.probability)
-            print("\n\n\n\n\n")
+        # if nearby_vehicle_idx == self.prediction_data.unique_id:
+
+        vehicle_maneuver_list = self.prediction_data.probability
+
+        first_maneuver = vehicle_maneuver_list[0]
+        print(self.prediction_data.unique_id)
+        print(first_maneuver.lane_keeping)
+        print(first_maneuver.right_change)
+        print(first_maneuver.left_change)
+        print("\n\n")
+
+
+
 
 
     def transform_to_local(self, global_position, reference_position, reference_theta):

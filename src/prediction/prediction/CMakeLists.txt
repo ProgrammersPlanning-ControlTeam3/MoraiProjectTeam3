@@ -27,6 +27,7 @@ add_message_files(
   TrackedObjectPoseList.msg
   PredictedHMM.msg
   ObjectFrenetPosition.msg
+  ManeuverProbability.msg
 )
 generate_messages(
   DEPENDENCIES
