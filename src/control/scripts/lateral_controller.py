@@ -285,9 +285,7 @@ class stanley:
         self.is_odom = False
         self.is_status = False
         self.is_global_path = False
-
         self.is_look_forward_point = True
-
         self.forward_point = Point()
         self.current_position = Point()
 

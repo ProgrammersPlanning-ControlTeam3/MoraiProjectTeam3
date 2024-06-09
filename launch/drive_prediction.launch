@@ -1,8 +1,8 @@
 <launch>
   <!-- PATH PLANNING-->
   <node pkg="path_planner" type="global_path_pub.py" name="global_path_pub" />
-  <node pkg="path_planner" type="local_path_pub.py" name="local_path_pub" />
-  <node pkg="path_planner" type="lattice_planner.py" name="lattice_path_pub" output="screen"/>
+  <node pkg="path_planner" type="local_path_frame_transform.py" name="local_path_pub" />
+  <node pkg="path_planner" type="lattice_planner_LC.py" name="lattice_path_pub" output="screen"/>
 
   <!-- <node pkg="parking" type="path_maker.py" name="parking" /> -->
 
@@ -14,8 +14,8 @@
   <node pkg="map_loader" type="mgeo_pub.py" name="mgeo_pub" />
 
   <!--Prediction-->
-  <node pkg="prediction" type="vehicle_tracker.py" name="vehicle_tracker" output="screen" />
-  <node pkg="prediction" type="visualization.py" name="prediction_visualization" output="screen" />
+  <node pkg="prediction" type="bayseian.py" name="bayseian"/>
+  <node pkg="prediction" type="visualization_hmm.py" name="visualization_hmm"/>
 
   <!-- RVIZ -->
   <node pkg = "rviz_runner" type="tf_pub.py" name="tf" />
