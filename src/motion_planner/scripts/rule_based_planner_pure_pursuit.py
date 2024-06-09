@@ -19,7 +19,9 @@ current_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_path)
 
 from lib.mgeo.class_defs import *
-sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
+
+sys.path.insert(0, '/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src')
+# sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 #print(sys.path)
 
 from control.scripts.pid_controller import pidControl
