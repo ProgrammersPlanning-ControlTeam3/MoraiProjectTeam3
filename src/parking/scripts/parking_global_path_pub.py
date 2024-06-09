@@ -21,7 +21,7 @@ class hybrid_a_star_pub :
         self.global_path_msg = Path()
         self.global_path_msg.header.frame_id = '/map'
 
-        self.global_path_msg = hybrid_a_star.get_hybrid_a_star_dubins_global_path()
+        _, self.global_path_msg = hybrid_a_star.hybrid_a_star()
 
         rate = rospy.Rate(10) # 10hz
         while not rospy.is_shutdown() :

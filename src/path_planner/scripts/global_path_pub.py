@@ -65,9 +65,10 @@ class dijkstra_path_pub :
 
         #global_path Parking
         # self.global_path_parking_waypoint, _ = hybrid_a_star.get_hybrid_a_star_dubins_global_path()
-        
+
+        #global_path 경로
         parking_waypoint, _ = hybrid_a_star.hybrid_a_star()
-        
+
         # print(len(parking_waypoint))
 
         for waypoint in parking_waypoint :
