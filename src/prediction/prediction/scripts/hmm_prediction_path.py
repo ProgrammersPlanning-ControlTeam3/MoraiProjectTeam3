@@ -77,19 +77,19 @@ class HMMPredictionPath:
         """다항식 계수와 x의 범위를 받아 y의 값을 계산합니다. points 집합"""
         return np.polyval(coefficients[::-1], x_range) # 100개 점 반환, 100개 크기의 배열 반환
 
-    def create_lane_change_path(self, current_s, current_d, current_v, predicted_state, lane_width=3.521):
+    def create_lane_change_path(self, current_s, current_d, current_v, lane_width=3.521):
         # 경로 생성 시뮬레이션 범위
         path=[]
         s_range = np.linspace(current_s, current_s + 100, num=100)  # 100m 앞까지 예측
         right_end_d = current_s + lane_width
-        right_coeff = self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, right_end_d, current_v))
+        right_coeff = self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, right_end_d, current_v), 5)
 
         #Left Change
         left_end_d = current_d - lane_width
-        left_coeff = self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, left_end_d, current_v))
+        left_coeff = self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, left_end_d, current_v), 5)
 
         #Lane Keeping
-        keeping_coeff =self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, current_d, current_v))
+        keeping_coeff =self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, current_d, current_v), 5)
 
 
         right_path = self.evaluate_polynomial(right_coeff, s_range)
@@ -101,6 +101,7 @@ class HMMPredictionPath:
     def publish_predicted_paths(self):
         while not rospy.is_shutdown():
             if self.is_prediction_received and self.is_frenet_data:
+                print("Path Publish START")
                 path_list=PredictedHMMPath()
                 path_list.header = Header(stamp=rospy.Time.now(), frame_id="map")
                 path_list.unique_id = self.prediction_data.unique_id
@@ -120,18 +121,17 @@ class HMMPredictionPath:
                     for maneuver_index, path_d in enumerate(paths):
                         points_array = []
                         for s, d in zip(s_range, path_d):
-                            x, y = get_cartesian(s, d, mapx, mapy, maps)
+                            x, y, _ = get_cartesian(s, d, mapx, mapy, maps)
                             point = TrackedPointHMM(x=x, y=y)
-                            points_array.append(point)
+                            points_array.append(point) # x, y로 변환한 정보를 담음
                         if maneuver_index == 0 :
                             path_list.lane_keeping_path = points_array
                         elif maneuver_index == 1:
                             path_list.right_change_path = points_array
                         elif maneuver_index ==2:
                             path_list.left_change_path = points_array
-                        print("path_list message: ", path_list)
-                        self.hmm_based_path.publish(path_list)
-
+                    print("path_list message: ", path_list)
+                    self.hmm_based_path.publish(path_list)
 
 if __name__ == "__main__":
     try:
