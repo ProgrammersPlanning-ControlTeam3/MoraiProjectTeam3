@@ -20,6 +20,11 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_message_files(
   FILES
+  ManeuverProbability.msg
+  ObjectFrenetPosition.msg
+  PredictedHMM.msg
+  PredictedHMMPath.msg
+  TrackedPointHMM.msg
   TrackedPoint.msg
   PredictedObjectPath.msg
   PredictedObjectPathList.msg
