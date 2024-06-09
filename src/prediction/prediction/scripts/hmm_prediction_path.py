@@ -4,17 +4,20 @@ import rospy
 import numpy as np
 import matplotlib.pyplot as plt
 from nav_msgs.msg import Path
-from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM, ObjectFrenetPosition
+from std_msgs.msg import Header
+from prediction.msg import TrackedPoint, TrackedPointHMM, PredictedHMMPath, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM, ObjectFrenetPosition
 from morai_msgs.msg import ObjectStatusList
 from utils import *
+
 class HMMPredictionPath:
     def __init__(self):
-        rospy.init_node("/hmm_prediction_path_node", anonymous=True)
+        rospy.init_node("hmm_prediction_path_node", anonymous=True)
         rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_info_callback)
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
         rospy.Subscriber("/Object_topic/hmm_prediction", PredictedHMM, self.prediction_info_callback)
         rospy.Subscriber("/Object_topic/frenet_position", ObjectFrenetPosition, self.object_frenet_info_callback)
-        self.hmm_based_path = rospy.Publisher('/Object_topic/hmm_predicted_path_topic', PredictedObjectPathList, queue_size=10)
+        self.hmm_based_path = rospy.Publisher('/Object_topic/hmm_predicted_path_topic', PredictedHMMPath, queue_size=10)
+
         self.rate = rospy.Rate(30)
         self.is_prediction_received = False
         self.prediction_data = None
@@ -23,7 +26,7 @@ class HMMPredictionPath:
         self.is_frenet_data = False
         self.frenet_data = None
 
-    def obejct_frenet_info_callback(self, msg):
+    def object_frenet_info_callback(self, msg):
         self.is_frenet_data = True
         self.frenet_data = msg
 
@@ -55,6 +58,7 @@ class HMMPredictionPath:
                 [3*x1**2, 2*x1, 1, 0]
             ])
             b = np.array([y0, y1, dy0, dy1])
+
         elif order == 5:
             # 5차 다항식: y = ax^5 + bx^4 + cx^3 + dx^2 + ex + f
             A = np.array([
@@ -70,64 +74,68 @@ class HMMPredictionPath:
         return coefficients
 
     def evaluate_polynomial(self, coefficients, x_range):
-        """다항식 계수와 x의 범위를 받아 y의 값을 계산합니다."""
-        return np.polyval(coefficients[::-1], x_range)
-    def create_lane_change_path(self, current_x, current_y, current_v, predicted_state, lane_width=3.521):
+        """다항식 계수와 x의 범위를 받아 y의 값을 계산합니다. points 집합"""
+        return np.polyval(coefficients[::-1], x_range) # 100개 점 반환, 100개 크기의 배열 반환
+
+    def create_lane_change_path(self, current_s, current_d, current_v, lane_width=3.521):
         # 경로 생성 시뮬레이션 범위
-        x_range = np.linspace(current_x, current_x + 100, num=100)  # 100m 앞까지 예측
+        path=[]
+        s_range = np.linspace(current_s, current_s + 100, num=100)  # 100m 앞까지 예측
+        right_end_d = current_s + lane_width
+        right_coeff = self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, right_end_d, current_v), 5)
 
-        if predicted_state == "Right Lane Change":
-            # 오른쪽 차선 변경
-            end_y = current_y + lane_width
-            coefficients = self.generate_polynomial_path((current_x, current_y, current_v), (current_x + 50, end_y, current_v))
-        elif predicted_state == "Left Lane Change":
-            # 왼쪽 차선 변경
-            end_y = current_y - lane_width
-            coefficients = self.generate_polynomial_path((current_x, current_y, current_v), (current_x + 50, end_y, current_v))
-        else:
-            # 차선 유지
-            coefficients = self.generate_polynomial_path((current_x, current_y, current_v), (current_x + 50, current_y, current_v))
+        #Left Change
+        left_end_d = current_d - lane_width
+        left_coeff = self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, left_end_d, current_v), 5)
 
-        path_y = self.evaluate_polynomial(coefficients, x_range)
-        return x_range, path_y
+        #Lane Keeping
+        keeping_coeff =self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, current_d, current_v), 5)
 
 
-    def path_publisher(self):
-        if self.is_prediction_received and self.is_frenet_data:
-            predicted_paths = PredictedObjectPathList()
-            predicted_paths.header.stamp = rospy.Time.now()
-            predicted_paths.header.frame_id = "map"
+        right_path = self.evaluate_polynomial(right_coeff, s_range)
+        left_path = self.evaluate_polynomial(left_coeff, s_range)
+        keeping_path = self.evaluate_polynomial(keeping_coeff, s_range)
+        path=[keeping_path, right_path, left_path] # 각 100개씩 점 포함.
+        return s_range, path
 
-            for prediction in self.prediction_data.predictions:
-                for frenet_position in self.frenet_data:
-                    if prediction.unique_id == frenet_position.unique_id:
-                        s_range, d_path = self.create_lane_change_path(
-                            frenet_position.s, frenet_position.d, frenet_position.speed, prediction.maneuver
-                        )
-                        path_msg = PredictedObjectPath()
-                        path_msg.header.stamp = rospy.Time.now()
-                        path_msg.header.framed_id = "map"
-                        path_msg.unique_id = prediction.unique_id
-                        path_msg.path = []
-
-                        for s, d in zip(s_range, d_path):
-                            mapx = [pose.pose.position.x for pose in self.global_path_msg.poses]
-                            mapy = [pose.pose.position.y for pose in self.global_path_msg.poses]
-                            maps =[0]
-                            for i in range(1, len(mapx)):
-                                maps.append(maps[-1] + get_dist(mapx[i-1], mapy[i-1], mapx[i], mapy[i]))
-                            x, y =get_cartesian(s, d, mapx, mapy, maps)  #### maps have to be defined.... HOW?
-                            point = TrackedPoint()
-                            point.x = x
-                            point.y=y
-                            path_msg.path.append(point)
-                        predicted_paths.paths.append(path_msg)
-            self.hmm_based_path.publish(predicted_paths)
-            rospy.loginfo("Pubslihed predicted paths for all vehicles.")
+    def publish_predicted_paths(self):
+        while not rospy.is_shutdown():
+            if self.is_prediction_received and self.is_frenet_data:
+                print("Path Publish START")
+                path_list=PredictedHMMPath()
+                path_list.header = Header(stamp=rospy.Time.now(), frame_id="map")
+                path_list.unique_id = self.prediction_data.unique_id
+                mapx = [pose.pose.position.x for pose in self.global_path_msg.poses]
+                mapy = [pose.pose.position.y for pose in self.global_path_msg.poses]
+                maps=[0]
+                for i in range(1, len(mapx)):
+                    maps.append(maps[-1] + get_dist(mapx[i-1], mapy[i-1], mapx[i], mapy[i]))
+                for prediction in self.prediction_data.probability:
+                    path_list.unique_id = self.prediction_data.unique_id
+                    s_range, paths = self.create_lane_change_path(
+                        self.frenet_data.s, self.frenet_data.d, self.frenet_data.speed
+                    )
+                    if not paths:
+                        rospy.logwarn("No paths generated for prediction")
+                        continue
+                    for maneuver_index, path_d in enumerate(paths):
+                        points_array = []
+                        for s, d in zip(s_range, path_d):
+                            x, y, _ = get_cartesian(s, d, mapx, mapy, maps)
+                            point = TrackedPointHMM(x=x, y=y)
+                            points_array.append(point) # x, y로 변환한 정보를 담음
+                        if maneuver_index == 0 :
+                            path_list.lane_keeping_path = points_array
+                        elif maneuver_index == 1:
+                            path_list.right_change_path = points_array
+                        elif maneuver_index ==2:
+                            path_list.left_change_path = points_array
+                    print("path_list message: ", path_list)
+                    self.hmm_based_path.publish(path_list)
 
 if __name__ == "__main__":
     try:
         paths = HMMPredictionPath()
-        paths.path_publisher()
+        paths.publish_predicted_paths()
     except rospy.ROSInitException:
         pass
