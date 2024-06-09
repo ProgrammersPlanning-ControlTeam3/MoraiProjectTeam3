@@ -105,7 +105,8 @@ class rule_based_planner:
 
                 self.ctrl_cmd_msg.steering = steering #0.0 last
 
-                output = self.pid.pid(self.re_target_velocity, self.status_msg.velocity.x * 3.6)
+                # output = self.pid.pid(self.re_target_velocity, self.status_msg.velocity.x * 3.6)
+                output = self.pid.pid(self.target_velocity, self.status_msg.velocity.x * 3.6)
 
                 if output > 0.0:
                     self.ctrl_cmd_msg.accel = output
