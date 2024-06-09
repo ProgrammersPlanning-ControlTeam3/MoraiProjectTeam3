@@ -5,7 +5,7 @@ import os, sys
 import rospy
 from math import cos, sin, pi, sqrt, pow, atan2
 from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
-from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM
+from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM, PredictedHMMPath
 from geometry_msgs.msg import Point, PoseStamped, Point32
 from nav_msgs.msg import Path, Odometry
 from std_msgs.msg import Int32
@@ -23,22 +23,25 @@ class latticePlanner:
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
 
         rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_callback)
-        rospy.Subscriber('/Object_topic/tracked_object_pose_topic', TrackedObjectPoseList, self.object_info_callback)
-        rospy.Subscriber('/Object_topic/tracked_object_path_topic', PredictedObjectPathList, self.object_path_callback)
         rospy.Subscriber('/Object_topic/deleted_object_id', Int32, self.deleted_object_callback)
         rospy.Subscriber('/Object_topic/hmm_prediction', PredictedHMM, self.prediction_info_callback)
+        rospy.Subscriber('/Object_topic/hmm_predicted_path_topic', PredictedHMMPath, self.prediction_path_callback)
 
         self.lattice_path_pub = rospy.Publisher('/lattice_path', Path, queue_size=1)
 
         self.is_path = False
         self.is_status = False
         self.is_obj = False
-        self.is_pose_received = False
-        self.object_pose = None
         self.is_path_received = False
         self.is_prediction_received = False
-        self.object_path = None
+        self.is_prediction_path_received = False
         self.deleted_ids = set()
+        self.prediction_path = None
+        self.vehicle_paths = {}
+        # 클래스 변수로 정의
+        self.vehicle_probability_LK = 0.0
+        self.vehicle_probability_LR = 0.0
+        self.vehicle_probability_LL = 0.0
 
         self.foward_vehicle_speed = 0
         self.target_velocity = 40  # Target Velocity in m/s
@@ -51,31 +54,51 @@ class latticePlanner:
                 if forward_vehicle is not None:
                     self.foward_vehicle_speed = forward_vehicle.velocity.x
 
-                    if self.is_prediction_received:
-                        self.npc_intension(forward_vehicle.unique_id)
+                    if self.is_prediction_received and self.is_prediction_path_received:
+                        self.predicted()
                 lattice_path = self.latticePlanner(self.local_path, self.x, self.y)
-                lattice_path_index = self.collision_check(self.object_data, self.object_path, lattice_path)
+                lattice_path_index = self.collision_check(self.object_data, lattice_path)
 
                 # (7)  lattice 경로 메세지 Publish
                 self.lattice_path_pub.publish(lattice_path[lattice_path_index])
 
             rate.sleep()
 
+
+    def predicted(self):
+        vehicle_manuever = self.prediction_data.maneuver
+
+        ## probability ##
+        vehicle_maneuvers = self.prediction_data.probability
+        vehicle_maneuvers_first = vehicle_maneuvers[0]
+        self.vehicle_probability_LK = vehicle_maneuvers_first.lane_keeping
+        self.vehicle_probability_LR = vehicle_maneuvers_first.right_change
+        self.vehicle_probability_LL = vehicle_maneuvers_first.left_change
+
+        ## path ##
+        vehicle_path_LK = self.prediction_path.lane_keeping_path
+        vehicle_path_LR = self.prediction_path.right_change_path
+        vehicle_path_LL = self.prediction_path.left_change_path
+
+        self.vehicle_paths = {
+            "lane_keeping": (vehicle_path_LK, self.vehicle_probability_LK),
+            "right_change": (vehicle_path_LR, self.vehicle_probability_LR),
+            "left_change": (vehicle_path_LL, self.vehicle_probability_LL)
+        }
+
+
+
     # TODO : When Forward/Right/Left vehicle is nearby. Need to create function returning nearby vehicle
     def npc_intension(self, nearby_vehicle_idx):
         # if nearby_vehicle_idx == self.prediction_data.unique_id:
-
         vehicle_maneuver_list = self.prediction_data.probability
 
         first_maneuver = vehicle_maneuver_list[0]
-        print(self.prediction_data.unique_id)
-        print(first_maneuver.lane_keeping)
-        print(first_maneuver.right_change)
-        print(first_maneuver.left_change)
-        print("\n\n")
-
-
-
+        # print(self.prediction_data.unique_id)
+        # print(first_maneuver.lane_keeping)
+        # print(first_maneuver.right_change)
+        # print(first_maneuver.left_change)
+        # print("\n\n")
 
 
     def transform_to_local(self, global_position, reference_position, reference_theta):
@@ -85,6 +108,34 @@ class latticePlanner:
                                     [sin(-reference_theta), cos(-reference_theta)]])
         local_position = rotation_matrix.dot(translation)
         return Point(x=local_position[0], y=local_position[1], z=0)
+
+
+    def transform_predicted_path_to_global(self, npc, predicted_path):
+        global_path = []
+        theta = npc.heading * pi / 180.0  # NPC의 heading 값을 라디안으로 변환
+
+
+
+        for pose in predicted_path:
+            local_x = pose.x
+            local_y = pose.y
+
+            # print(f"NPC Heading (rad): {theta}")
+            # print(f"NPC Position: {npc.position.x}, {npc.position.y}")
+
+            # print(f"Local Pose: {local_x}, {local_y}")
+
+            # x와 y 좌표를 각도 theta와 위치를 고려하여 변환
+            global_x = local_x * cos(theta) - local_y * sin(theta) + npc.position.x
+            global_y = local_x * sin(theta) + local_y * cos(theta) + npc.position.y
+
+            # print(f"Global Pose: {global_x}, {global_y}")
+
+            global_path.append(Point(x=global_x, y=global_y, z=0))
+        
+        return global_path
+
+
 
     def get_forward_vehicle(self, ref_path, object_data):
 
@@ -124,8 +175,8 @@ class latticePlanner:
                     return True
 
         return False
-    
-    def checkObject_npc_path(self, ref_path, object_path):
+
+    def checkObject_npc_path(self, ref_path):
         
         def is_path_overlap(path_pose, predicted_pose, threshold):
             dis = sqrt(pow(path_pose.x - predicted_pose.x, 2) + pow(path_pose.y - predicted_pose.y, 2))
@@ -138,9 +189,9 @@ class latticePlanner:
         local_path = [self.transform_to_local(pose.pose.position, vehicle_position, theta) for pose in ref_path.poses]
 
         # npc's predicted path
-        if object_path is not None:
+        if self.prediction_path is not None:
             for local_pose in local_path:
-                for predicted_path in object_path.path_list:
+                for predicted_path in self.prediction_path.path_list:
                     for predicted_pose in predicted_path.path:
                         local_predicted_position = self.transform_to_local(Point(x=predicted_pose.x, y=predicted_pose.y, z=0), vehicle_position, theta)
                         if is_path_overlap(local_pose, local_predicted_position, 2.35):
@@ -148,13 +199,12 @@ class latticePlanner:
                             return True
         return False    
 
-    def collision_check(self, object_data, object_path, out_path):
+
+    def collision_check(self, object_data, out_path):
         # 생성된 충돌 회피 경로 중 낮은 비용의 경로 선택
 
         selected_lane = -1
         lane_weight = [15, 5, 0, 500, 15, 5, 0, 500]  # reference path
-
-        # path_size = 50
 
         path_size = self.foward_vehicle_speed
         if self.foward_vehicle_speed == 0:
@@ -206,29 +256,28 @@ class latticePlanner:
                             lane_weight[path_num] += weight_increase
 
                     # NPC의 예측 경로와 local path 검사
-                    if object_path is not None:
-                        for predicted_path in object_path.path_list:
-                            if predicted_path.unique_id == forward_vehicle_id:
-                                continue  # Skip forward vehicle's predicted path
-                            for predicted_pose in predicted_path.path:
-                                if is_path_overlap(path_pos, predicted_pose, 2.35):
-                                    if path_num < 4:
-                                        lane_weight[path_num] += 5
-                                    else:
-                                        lane_weight[path_num] += 3
+                    if self.prediction_path is not None:
+                        for npc in object_data.npc_list:
+                            predicted_paths = {
+                                "lane_keeping": (self.prediction_path.lane_keeping_path, self.vehicle_probability_LK),
+                                "right_change": (self.prediction_path.right_change_path, self.vehicle_probability_LR),
+                                "left_change": (self.prediction_path.left_change_path, self.vehicle_probability_LL)
+                            }
+                            for maneuver, (predicted_path, prob) in predicted_paths.items():
+                                # print(predicted_path, "\n\n\n\n\n\n\n\n\n\n")
+                                global_predicted_path = self.transform_predicted_path_to_global(npc, predicted_path)
+                                for global_predicted_pose in global_predicted_path:
+                                    if is_path_overlap(path_pos, global_predicted_pose, 2.35):
+                                        if path_num < 4:
+                                            lane_weight[path_num] += 5
+                                        else:
+                                            lane_weight[path_num] += 3
+
+                                        lane_weight[path_num] += int((1 - prob) * 10)
 
         selected_lane = lane_weight.index(min(lane_weight))
-        # print("Lane change : ", selected_lane)
-        # print("0 : ", lane_weight[0])
-        # print("1 : ", lane_weight[1])
-        # print("2 : ", lane_weight[2])
-        # print("3 : ", lane_weight[3])
-        # print("4 : ", lane_weight[4])
-        # print("5 : ", lane_weight[5])
-        # print("6 : ", lane_weight[6])
-        # print("7 : ", lane_weight[7])
-        # print("\n")
         return selected_lane
+
 
 
     def path_callback(self, msg):
@@ -248,20 +297,19 @@ class latticePlanner:
         self.is_obj = True
         self.object_data = msg
 
-    def object_info_callback(self, msg):
-        self.is_pose_received = True
-        self.object_pose = msg
-
-    def object_path_callback(self, msg):
-        self.is_path_received = True
-        self.object_path = msg
-
     def deleted_object_callback(self, msg):
         self.deleted_ids.add(msg.data)
 
     def prediction_info_callback(self, msg):
         self.is_prediction_received = True
         self.prediction_data = msg
+        # unique_id, maneuver: "Lane Keeping", probability[lane_keeping, right_change, left_change]
+
+    def prediction_path_callback(self, msg):
+        self.is_prediction_path_received = True
+        self.prediction_path = msg
+        print(msg)
+        # unique_id, lane_keeping_path, right_change_path, left_change_path
 
     def generate_5th_order_polynomial(self, ys, yf, xs, xf):
         # 5차 곡선 계수 계산

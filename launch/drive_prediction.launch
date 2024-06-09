@@ -15,7 +15,8 @@
 
   <!--Prediction-->
   <node pkg="prediction" type="bayseian.py" name="bayseian"/>
-  <node pkg="prediction" type="visualization_hmm.py" name="visualization_hmm"/>
+  <!-- <node pkg="prediction" type="visualization_hmm.py" name="visualization_hmm"/> -->
+  <node pkg="prediction" type="hmm_prediction_path.py" name="hmm_prediction_path" />
 
   <!-- RVIZ -->
   <node pkg = "rviz_runner" type="tf_pub.py" name="tf" />
