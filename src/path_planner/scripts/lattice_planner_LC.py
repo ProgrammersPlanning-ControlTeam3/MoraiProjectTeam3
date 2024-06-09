@@ -79,6 +79,7 @@ class latticePlanner:
         vehicle_path_LK = self.prediction_path.lane_keeping_path
         vehicle_path_LR = self.prediction_path.right_change_path
         vehicle_path_LL = self.prediction_path.left_change_path
+        print(len(self.prediction_path.left_change_path))
 
         self.vehicle_paths = {
             "lane_keeping": (vehicle_path_LK, self.vehicle_probability_LK),
