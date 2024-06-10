@@ -115,8 +115,19 @@ class MPCController:
             # Kinematic model constraints
             constraints += [x[t+1] == x[t] + self.status_msg.velocity.x * dt]               # Update x position
             constraints += [y[t+1] == y[t] + self.status_msg.velocity.x * theta[t] * dt]    # Update y position
+            """       
+                현재
+                1) x_t+1 = x_t + v*dt
+                2) y_t+1 = y_t + v*theta*dt
+                
+                원래는 아래처럼 하고싶었는데, cp.cos, cp.sin, np.sin, np.cos 모두 사용 불가능 하더라구요..
+                각도 변화가 작다고 가정하고 위에 처럼 해놨습니다.
+                1) x_t+1 = x_t + v*cos(theta)*dt
+                2) y_t+1 = y_t + v*sin(theta)*dt
+                
+            """            
             constraints += [theta[t+1] == theta[t] + (self.status_msg.velocity.x / self.vehicle_length) * delta[t] * dt]    # Update heading angle
-            constraints += [cp.abs(delta[t]) <= np.pi / 4]        # Steering angle limits
+            constraints += [cp.abs(delta[t]) <= np.pi / 4]        # limits Steering angle 
 
         # Solve optimization problem
         prob = cp.Problem(cp.Minimize(cost), constraints)
