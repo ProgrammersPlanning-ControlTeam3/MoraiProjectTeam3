@@ -196,13 +196,13 @@ class latticePlanner:
                     # NPC의 예측 경로와 local path 검사
                     if object_path is not None:
                         for predicted_path in object_path.path_list:
-                            if forward_vehicle_id is not None and predicted_path.unique_id == forward_vehicle_id:
-                                continue  # Skip forward vehicle's predicted path
                             if n < len(predicted_path.path):
                                 npc_circle_center = predicted_path.path[n]  # NPC의 n번째 위치를 원의 중심으로
 
                                 # 충돌 여부 검사 및 weight 증가
-                                if is_circle_overlap(vehicle_circle_center, npc_circle_center, 2.5):
+                                if is_circle_overlap(vehicle_circle_center, npc_circle_center, 1):
+                                    lane_weight[path_num] += 20
+                                elif is_circle_overlap(vehicle_circle_center, npc_circle_center, 2.5):
                                     lane_weight[path_num] += 10
                                 elif is_circle_overlap(vehicle_circle_center, npc_circle_center, 5.0):
                                     lane_weight[path_num] += 5
