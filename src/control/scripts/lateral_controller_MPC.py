@@ -61,7 +61,6 @@ class MPCController:
         self.is_status = True
         self.status_msg = msg
 
-
     def global_to_local(self, global_path, current_position, current_yaw):
         local_path = []
         for pose in global_path.poses:
@@ -79,10 +78,10 @@ class MPCController:
         if not self.is_path or not self.is_status:
             return 0.0, 0.0
 
-        N = self.horizon  # Prediction horizon
+        N = self.horizon  # MPC horizon
         dt = self.dt  # Time step
 
-        # Local path conversion
+        # Convert path to local frame (global frame to local frame)
         local_path = self.global_to_local(self.path, self.current_position, self.vehicle_yaw)
 
         # Initialize optimization variables
@@ -90,64 +89,58 @@ class MPCController:
         y = cp.Variable(N+1)
         theta = cp.Variable(N+1)
         delta = cp.Variable(N)
-        # a = cp.Variable(N)
 
         # Initialize cost and constraints
         cost = 0
         constraints = []
 
         # Initial conditions
-        constraints += [x[0] == 0]  # Local coordinates: initial x = 0
-        constraints += [y[0] == 0]  # Local coordinates: initial y = 0
-        constraints += [theta[0] == 0]  # Local coordinates: initial heading angle = 0
+        constraints += [x[0] == 0]
+        constraints += [y[0] == 0]
+        constraints += [theta[0] == 0]
 
         for t in range(N):
-            # Get the reference path point in local coordinates
             ref_path = local_path[min(t, len(local_path)-1)]
 
-            # Define the cost function as the deviation from the reference path
-            cost += 0.1 * cp.square(x[t+1] - ref_path[0])  # x error cost
-            cost += 1.0 * cp.square(y[t+1] - ref_path[1])  # y error cost
+            # Add cost terms for position and steering
+            cost += 0.1 * cp.square(x[t+1] - ref_path[0])   # Minimize x position error
+            cost += 5.0 * cp.square(y[t+1] - ref_path[1])   # Minimize y position error
+            cost += 0.2 * cp.square(delta[t])               # Minimize steering angle
 
-            # Add a regularization term to minimize the control input
-            cost += 0.1 * cp.square(delta[t])
-            # cost += 0.1 * cp.square(a[t])
-
+            # Smooth steering changes
             if t < N - 1:
-                # Penalize changes in steering to smooth the trajectory
-                cost += 100.0 * cp.square(delta[t+1] - delta[t])
-                # cost += 10.0 * cp.square(a[t+1] - a[t])
+                cost += 200.0 * cp.square(delta[t+1] - delta[t])
+                constraints += [cp.abs(delta[t+1] - delta[t]) <= np.pi / 16]
 
-            # Vehicle kinematics constraints using linear approximation
-            constraints += [x[t+1] == x[t] + self.status_msg.velocity.x * dt]
-            constraints += [y[t+1] == y[t] + self.status_msg.velocity.x * theta[t] * dt]
-            constraints += [theta[t+1] == theta[t] + (self.status_msg.velocity.x / self.vehicle_length) * delta[t] * dt]
+            # Kinematic model constraints
+            constraints += [x[t+1] == x[t] + self.status_msg.velocity.x * dt]               # Update x position
+            constraints += [y[t+1] == y[t] + self.status_msg.velocity.x * theta[t] * dt]    # Update y position
+            constraints += [theta[t+1] == theta[t] + (self.status_msg.velocity.x / self.vehicle_length) * delta[t] * dt]    # Update heading angle
+            constraints += [cp.abs(delta[t]) <= np.pi / 4]        # Steering angle limits
 
-            # Steering angle and acceleration limits
-            constraints += [cp.abs(delta[t]) <= np.pi / 8]  # Reduce steering angle limit to π/8
-            # constraints += [cp.abs(a[t]) <= 1.0]
-
+        # Solve optimization problem
         prob = cp.Problem(cp.Minimize(cost), constraints)
         prob.solve()
 
-        # Print y[t+1] values after solving the problem
-        print("Optimized y values:")
-        for t in range(N+1):
-            print(f'y[{t}] = {y[t].value}')
-
-        print("Optimized delta values:")
-        for t in range(N):
-            print(f'delta[{t}] = {delta[t].value}')
-
+        # Return steering angle
         if delta.value is not None and len(delta.value) > 0:
             steering_angle = delta.value[0]
+            self.calculate_error()
             return steering_angle
         else:
             return 0.0
 
 
-
-
+    def calculate_error(self):
+        if self.global_path and len(self.x_ego) > 0 and len(self.y_ego) > 0:
+            ego_position = np.array([self.x_ego[-1], self.y_ego[-1]])
+            min_dist = float('inf')
+            for pose in self.global_path.poses:
+                global_point = np.array([pose.pose.position.x, pose.pose.position.y])
+                dist = np.linalg.norm(ego_position - global_point)
+                if dist < min_dist:
+                    min_dist = dist
+            self.errors.append(min_dist)
 
 
     def get_current_waypoint(self, ego_status, global_path):
@@ -206,21 +199,21 @@ def plot_paths(global_path, x_ego, y_ego, total_time, variance, mean_error, max_
 
     plt.show()
 
-# if __name__ == "__main__":
-#     rospy.init_node('mpc_path_tracking_node', anonymous=True)
+if __name__ == "__main__":
+    rospy.init_node('mpc_path_tracking_node', anonymous=True)
 
-#     mpc_controller = MPCController()
+    mpc_controller = MPCController()
 
-#     rate = rospy.Rate(10)  # 10 Hz
-#     while not rospy.is_shutdown():
-#         if mpc_controller.is_path and mpc_controller.is_odom and mpc_controller.is_status:
-#             steering = mpc_controller.mpc_control()
-#             # Control commands should be published to the vehicle here
-#         rate.sleep()
+    rate = rospy.Rate(10)  # 10 Hz
+    while not rospy.is_shutdown():
+        if mpc_controller.is_path and mpc_controller.is_odom and mpc_controller.is_status:
+            steering = mpc_controller.mpc_control()
+            # Control commands should be published to the vehicle here
+        rate.sleep()
 
-#     mpc_controller.set_end_time()
+    mpc_controller.set_end_time()
 
-#     if mpc_controller.global_path is not None:
-#         mean_error, max_error, variance = mpc_controller.calculate_statistics()
-#         plot_paths(mpc_controller.global_path, mpc_controller.x_ego, mpc_controller.y_ego,
-#                    mpc_controller.calculate_total_time(), variance, mean_error, max_error)
+    if mpc_controller.global_path is not None:
+        mean_error, max_error, variance = mpc_controller.calculate_statistics()
+        plot_paths(mpc_controller.global_path, mpc_controller.x_ego, mpc_controller.y_ego,
+                   mpc_controller.calculate_total_time(), variance, mean_error, max_error)
