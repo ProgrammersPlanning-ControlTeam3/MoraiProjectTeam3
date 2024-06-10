@@ -71,31 +71,46 @@ class HMMPredictionPath:
             ])
             b = np.array([y0, y1, dy0, dy1, 0, 0])  # 가속도 0으로 가정
         coefficients = np.linalg.solve(A, b)
+        print("coeffcients", coefficients)
         return coefficients
+    def generate_5th_order_polynomial(self, ys, yf, xs, xf):
+        # 5차 곡선 계수 계산
+        if xf == 0:
+            return [ys, 0, 0, 0, 0, 0]  # xf가 0일 경우를 처리
+        a0 = ys
+        a1 = 0
+        a2 = 0
+        a3 = (10 * (yf - ys)) / (xf ** 3)
+        a4 = (-15 * (yf - ys)) / (xf ** 4)
+        a5 = (6 * (yf - ys)) / (xf ** 5)
+        return [a0, a1, a2, a3, a4, a5]
+
+    def calculate_polynomial(self, a, x_vals):
+        return a[0] + a[1] * x_vals + a[2] * x_vals**2 + a[3] * x_vals**3 + a[4] * x_vals**4 + a[5] * x_vals**5
 
     def evaluate_polynomial(self, coefficients, x_range):
         """다항식 계수와 x의 범위를 받아 y의 값을 계산합니다. points 집합"""
         return np.polyval(coefficients[::-1], x_range) # 100개 점 반환, 100개 크기의 배열 반환
 
-    def create_lane_change_path(self, current_s, current_d, current_v, lane_width=3.521):
+    def create_lane_change_path(self, current_s, current_d, lane_width=3.521):
         # 경로 생성 시뮬레이션 범위
         path=[]
-        s_range = np.linspace(current_s, current_s + 100, num=100)  # 100m 앞까지 예측
+        s_range = np.linspace(current_s, current_s + 10, num=100)  # 100m 앞까지 예측
         right_end_d = current_s + lane_width
-        right_coeff = self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, right_end_d, current_v), 5)
+        right_coeff = self.generate_5th_order_polynomial(current_d, right_end_d, current_s, current_s + 10)
 
         #Left Change
         left_end_d = current_d - lane_width
-        left_coeff = self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, left_end_d, current_v), 5)
+        left_coeff = self.generate_5th_order_polynomial(current_d, left_end_d, current_s, current_s + 10)
 
         #Lane Keeping
-        keeping_coeff =self.generate_polynomial_path((current_s, current_d, current_v), (current_s + 50, current_d, current_v), 5)
-
+        keeping_coeff =self.generate_5th_order_polynomial(current_d, current_d, current_s, current_s+10)
 
         right_path = self.evaluate_polynomial(right_coeff, s_range)
         left_path = self.evaluate_polynomial(left_coeff, s_range)
         keeping_path = self.evaluate_polynomial(keeping_coeff, s_range)
         path=[keeping_path, right_path, left_path] # 각 100개씩 점 포함.
+
         return s_range, path
 
     def publish_predicted_paths(self):
@@ -107,13 +122,16 @@ class HMMPredictionPath:
                 path_list.unique_id = self.prediction_data.unique_id
                 mapx = [pose.pose.position.x for pose in self.global_path_msg.poses]
                 mapy = [pose.pose.position.y for pose in self.global_path_msg.poses]
+                #print("mapx ", mapx)
+                #print("mapy" , mapy)
                 maps=[0]
                 for i in range(1, len(mapx)):
                     maps.append(maps[-1] + get_dist(mapx[i-1], mapy[i-1], mapx[i], mapy[i]))
                 for prediction in self.prediction_data.probability:
                     path_list.unique_id = self.prediction_data.unique_id
+                    #print("FRENET s, d == ::: ", self.frenet_data.s, self.frenet_data.d)
                     s_range, paths = self.create_lane_change_path(
-                        self.frenet_data.s, self.frenet_data.d, self.frenet_data.speed
+                        self.frenet_data.s, self.frenet_data.d
                     )
                     if not paths:
                         rospy.logwarn("No paths generated for prediction")
@@ -121,7 +139,10 @@ class HMMPredictionPath:
                     for maneuver_index, path_d in enumerate(paths):
                         points_array = []
                         for s, d in zip(s_range, path_d):
+                            #print(s, d)
+                            #print("s, d ::::::::::::::::::::::::::::", s, d)
                             x, y, _ = get_cartesian(s, d, mapx, mapy, maps)
+                            print("x, y :::::::::::::::::::", x, y)
                             point = TrackedPointHMM(x=x, y=y)
                             points_array.append(point) # x, y로 변환한 정보를 담음
                         if maneuver_index == 0 :
@@ -130,7 +151,7 @@ class HMMPredictionPath:
                             path_list.right_change_path = points_array
                         elif maneuver_index ==2:
                             path_list.left_change_path = points_array
-                    print("path_list message: ", path_list)
+                    #print("path_list message: ", path_list)
                     self.hmm_based_path.publish(path_list)
 
 if __name__ == "__main__":
