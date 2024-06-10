@@ -2,18 +2,19 @@
     <!-- PATH PLANNING-->
     <node pkg="parking" type="parking_global_path_pub.py" name="parking_global_path_pub" />
     <!-- <node pkg="path_planner" type="global_path_pub.py" name="global_path_pub" /> -->
-    <node pkg="path_planner" type="local_path_frame_transform.py" name="local_path_pub" />
-    <!-- <node pkg="path_planner" type="lattice_planner_LC.py" name="lattice_path_pub" output="screen"/> -->
-  
-    <!-- <node pkg="parking" type="path_maker.py" name="parking" /> -->
-  
+    <node pkg="path_planner" type="local_path_frame_transform_for_parking.py" name="local_path_pub" />
+    <node pkg="path_planner" type="lattice_planner_LC.py" name="lattice_path_pub" output="screen"/>
+
+    <!-- visualize Obstacle -->
+    <node pkg="parking" type="visualizeObstacle.py" name="visualize_obstacle" />
+
     <!-- CONTROL_Pure Pursuit -->
     <node pkg="motion_planner" type="rule_based_planner_stanley.py" name="rule_based_planner" output="screen"/>
-  
+
     <!-- GPS AND IMU SENSOR -->
     <node pkg="state_estimator" type="gpsimu_parser.py" name="GPS_IMU_parser" />
     <node pkg="map_loader" type="mgeo_pub.py" name="mgeo_pub" />
-  
+
     <!--Prediction-->
     <!-- <node pkg="prediction" type="vehicle_tracker.py" name="vehicle_tracker"/> -->
     <!-- <node pkg="prediction" type="visualization.py" name="prediction_visualization"/> -->

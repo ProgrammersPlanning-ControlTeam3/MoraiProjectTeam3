@@ -8,7 +8,7 @@
   <!-- <node pkg="parking" type="parking_global_path_pub.py" name="parking_global_path_pub" /> -->
 
   <!-- visualize Obstacle -->
-  <node pkg="parking" type="visualizeObstacle.py.py" name="visualize_obstacle" />
+  <node pkg="parking" type="visualizeObstacle.py" name="visualize_obstacle" />
   
 
   <!-- <node pkg="parking" type="path_maker.py" name="parking" /> -->
