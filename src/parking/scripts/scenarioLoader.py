@@ -15,7 +15,7 @@ class ScenarioLoader():
         # self.path = 'src/random_scenario_maker/scenario/random_obstacle_scenario_for_test.json'
         #Sample 시나리오
         # self.path = '/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src/random_scenario_maker/scenario/random_obstacle_scenario.json'
-        
+
         with open(self.path, 'r') as f:
             self.data = json.load(f)
         self.objectList = self.data['objectList']

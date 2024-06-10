@@ -5,9 +5,8 @@
 
   <node pkg="path_planner" type="lattice_planner_LC.py" name="lattice_path_pub" output="screen"/>
 
-
   <!-- CONTROL_Pure Pursuit -->
-  <!-- <node pkg="motion_planner" type="rule_based_planner_avoid_obstacle.py" name="rule_based_planner" output="screen"/> -->
+  <node pkg="motion_planner" type="rule_based_planner_avoid_obstacle.py" name="rule_based_planner" output="screen"/>
 
   <!-- GPS AND IMU SENSOR -->
   <node pkg="state_estimator" type="gpsimu_parser.py" name="GPS_IMU_parser" />

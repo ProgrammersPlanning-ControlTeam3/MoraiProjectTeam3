@@ -57,7 +57,7 @@ class pure_pursuit :
         self.is_look_forward_point = False
         
         self.forward_point = Point()
-        self.current_postion = Point()
+        self.current_position = Point()
 
         self.vehicle_length = 4.470 # wheel base 2.7 Length(m) : 4.470
 
@@ -66,37 +66,37 @@ class pure_pursuit :
         # self.max_lfd = 200
         # self.lfd_gain = 3.0
         # self.target_velocity = 40.0   # default = 40
-        
+
         # self.lfd = 5
         # self.min_lfd = 1
         # self.max_lfd = 80
         # self.lfd_gain = 1.3
-        
+
         # Test Jeonghoon
         self.lfd = 0.0
         self.min_lfd = 2.7 # 1 # 0.8
         self.max_lfd = 30 #  80 # 60
         self.lfd_gain = 1.0 # 1.3
         self.target_velocity = 35
-        
-        ######### 
+
+        #########
         self.pid = pidControl()
         self.vel_planning = velocityPlanning(self.target_velocity/3.6, 0.15)
 
         while True:
             if self.is_global_path == True:
-                self.velocity_list = self.vel_planning.curvedBaseVelocity(self.global_path, 70) # ponit_num 50 -> 35
+                self.velocity_list = self.vel_planning.curvedBaseVelocity(self.global_path, 70) # point_num 50 -> 35
                 # rospy.loginfo("Velocity List: %s", self.velocity_list[:25])
-                rospy.loginfo('Recieved global path data')
+                rospy.loginfo('Received global path data')
                 break
             else:
                 pass
                 # rospy.loginfo('Waiting global path data')
 
         rate = rospy.Rate(30) # 30 -> 50 -> 30 Hz
-        
+
         while not rospy.is_shutdown():
-            
+
             ## can not enter to if
             if self.is_path == True and self.is_odom == True and self.is_status == True:
                 prev_time = time.time()
@@ -108,24 +108,23 @@ class pure_pursuit :
                 # rospy.loginfo("target_velocity: %s", self.target_velocity)
                 steering = self.calc_pure_pursuit()
                 # rospy.loginfo("steering: %s", steering)
-                
+
                 if self.is_look_forward_point :
                     self.ctrl_cmd_msg.steering = steering
-                else : 
+                else :
                     rospy.loginfo("no found forward point")
                     self.ctrl_cmd_msg.steering = 0.0
-                
+
                 output = self.pid.pid(self.target_velocity,self.status_msg.velocity.x*3.6)
                 # rospy.loginfo("output: %s", output)
-                
-                # if output > -17.0: #defaul 0.0
+
+                # if output > -17.0: #default 0.0
                 #     self.ctrl_cmd_msg.accel = output
                 #     self.ctrl_cmd_msg.brake = 0.0
                 # else:
                 #     self.ctrl_cmd_msg.accel = 0.0
                 #     self.ctrl_cmd_msg.brake = -output
                 #     print (output)
-                
                 if output > 0.0:
                     self.ctrl_cmd_msg.accel = output # output  0 ~ 1.0
                     self.ctrl_cmd_msg.brake = 0.0
@@ -136,14 +135,14 @@ class pure_pursuit :
                 else:
                     self.ctrl_cmd_msg.accel = 0.0
                     self.ctrl_cmd_msg.brake = 0.35 # -output # output 0 ~ 1.0
-                    
+
                 ## boost
                 # if(self.status_msg.position.x > -29.0 and -105.0 < self.status_msg.position.y < -100.0):
                 #     self.ctrl_cmd_msg.steering = 0.0
                 #     self.ctrl_cmd_msg.accel = 0.3
                 #     self.ctrl_cmd_msg.brake = 0.0
                 #     self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
-                
+
                 ## Stop at end point
                 if(self.status_msg.position.x > 157.0):
                     self.ctrl_cmd_msg.steering = 0.0
@@ -152,7 +151,7 @@ class pure_pursuit :
                     self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
                     print("Finished.")
                     # print("distance from barrels :", 171.34324645996094-self.status_msg.position.x-self.vehicle_length)
-                
+
                 #TODO: (8) 제어입력 메세지 Publish
                 self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
 
@@ -161,26 +160,25 @@ class pure_pursuit :
     def path_callback(self,msg):
         self.is_path=True
         self.path=msg
-        
-    def status_callback(self,msg): ## Vehicl Status Subscriber 
-        self.is_status=True
-        self.status_msg=msg    
 
-    
+    def status_callback(self,msg): ## Vehicle Status Subscriber
+        self.is_status=True
+        self.status_msg=msg
+
     def odom_callback(self,msg):
         self.is_odom=True
         odom_quaternion=(msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z,msg.pose.pose.orientation.w)
         _,_,self.vehicle_yaw=euler_from_quaternion(odom_quaternion)
-        self.current_postion.x=msg.pose.pose.position.x
-        self.current_postion.y=msg.pose.pose.position.y
-    
+        self.current_position.x=msg.pose.pose.position.x
+        self.current_position.y=msg.pose.pose.position.y
+
     def global_path_callback(self,msg):
         self.global_path = msg
         self.is_global_path = True
-        
+
     def get_current_waypoint(self,ego_status,global_path):
-        min_dist = float('inf')        
-        currnet_waypoint = -1
+        min_dist = float('inf')
+        current_waypoint = -1
         for i,pose in enumerate(global_path.poses):
             dx = ego_status.position.x - pose.pose.position.x
             dy = ego_status.position.y - pose.pose.position.y
@@ -188,26 +186,26 @@ class pure_pursuit :
             dist = sqrt(pow(dx,2)+pow(dy,2))
             if min_dist > dist :
                 min_dist = dist
-                currnet_waypoint = i
-        return currnet_waypoint
+                current_waypoint = i
+        return current_waypoint
 
     def calc_pure_pursuit(self,):
 
         #TODO: (2) 속도 비례 Look Ahead Distance 값 설정
         self.lfd = (self.status_msg.velocity.x) * self.lfd_gain
-        
+
         if self.lfd < self.min_lfd : 
             self.lfd=self.min_lfd
         elif self.lfd > self.max_lfd :
             self.lfd=self.max_lfd
-        
+
         # rospy.loginfo("lfd: %s", self.lfd)
-        
-        vehicle_position=self.current_postion
+
+        vehicle_position=self.current_position
         self.is_look_forward_point= False
 
         translation = [vehicle_position.x, vehicle_position.y]
-        
+
         #TODO: (3) 좌표 변환 행렬 생성
         trans_matrix = np.array([
                 [cos(self.vehicle_yaw), -sin(self.vehicle_yaw),translation[0]],
@@ -228,9 +226,9 @@ class pure_pursuit :
         #             self.forward_point = path_point
         #             self.is_look_forward_point = True
         #             break
-        
+
         steering = 0.0  # init sterring
-        
+
         for num, i in enumerate(self.path.poses):
             path_point = i.pose.position
 
@@ -247,7 +245,6 @@ class pure_pursuit :
                     steering = atan2((2 * self.vehicle_length * sin(theta)), self.lfd)
                     break
 
-        
         # #TODO: (4) Steering 각도 계산
         # theta = atan2(local_path_point[1],local_path_point[0])
         # # rospy.loginfo("local_path_point: %s", local_path_point)
