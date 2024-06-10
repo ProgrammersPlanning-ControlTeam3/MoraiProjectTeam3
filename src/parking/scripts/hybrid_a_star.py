@@ -198,7 +198,7 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
         # print("cur node = ", cur_index, cur_node.position, cur_node.f)
 
         # If goal, return optimal path
-        if (isSamePosition(cur_node, goal_node, epsilon_position=7)):
+        if (isSamePosition(cur_node, goal_node, epsilon_position=8)):
             opt_path = []
             node = cur_node
             while node is not None :
