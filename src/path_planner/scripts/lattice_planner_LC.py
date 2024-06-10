@@ -367,7 +367,7 @@ class latticePlanner:
 
 
                     # 5차 곡선
-                    xs = 0
+                    xs = vehicle_s
                     xf = goal_s_with_offset - vehicle_s
                     ys = vehicle_d
                     yf = goal_d_with_offset
