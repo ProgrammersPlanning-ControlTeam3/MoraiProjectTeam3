@@ -268,6 +268,9 @@ class stanley:
         rospy.Subscriber("/lattice_path", Path, self.path_callback)
         rospy.Subscriber("/local_path", Path, self.local_path_callback)
 
+        self.forward_point = Point()
+        self.current_position = Point()
+
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
         rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_callback)
@@ -280,8 +283,6 @@ class stanley:
 
         self.is_look_forward_point = True
 
-        self.forward_point = Point()
-        self.current_position = Point()
 
         self.target_velocity = 40  # Target Velocity in m/s
 
