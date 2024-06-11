@@ -14,15 +14,16 @@
   <!-- <node pkg="parking" type="path_maker.py" name="parking" /> -->
 
   <!-- CONTROL_Pure Pursuit -->
-  <node pkg="motion_planner" type="rule_based_planner_avoid_obstacle.py" name="rule_based_planner" output="screen"/>
+  <!-- <node pkg="motion_planner" type="rule_based_planner_avoid_obstacle.py" name="rule_based_planner" output="screen"/> -->
+  <node pkg="motion_planner" type="rule_based_planner_parking_stanley.py" name="rule_based_planner" output="screen"/>
 
   <!-- GPS AND IMU SENSOR -->
   <node pkg="state_estimator" type="gpsimu_parser.py" name="GPS_IMU_parser" />
   <node pkg="map_loader" type="mgeo_pub.py" name="mgeo_pub" />
 
   <!--Prediction-->
-  <node pkg="prediction" type="vehicle_tracker.py" name="vehicle_tracker" output="screen" />
-  <node pkg="prediction" type="visualization.py" name="prediction_visualization" output="screen" />
+  <node pkg="prediction" type="vehicle_tracker.py" name="vehicle_tracker" />
+  <node pkg="prediction" type="visualization.py" name="prediction_visualization" />
 
   <!-- RVIZ -->
   <node pkg = "rviz_runner" type="tf_pub.py" name="tf" />
