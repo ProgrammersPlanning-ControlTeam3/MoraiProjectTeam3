@@ -3,9 +3,9 @@
 import numpy as np
 from math import sqrt
 class velocityPlanning:
-    def __init__(self, car_max_speed, road_friciton):
+    def __init__(self, car_max_speed, road_friction):
         self.car_max_speed = car_max_speed
-        self.road_friction = road_friciton
+        self.road_friction = road_friction
 
     def curvedBaseVelocity(self, global_path, point_num):
         out_vel_plan = []
