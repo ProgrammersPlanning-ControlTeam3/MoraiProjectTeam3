@@ -321,7 +321,7 @@ def main():
     dubins_global_path = []
 
     #포인트 간의 dubins path 를 추출해줌
-    for i in range(len(dubins_base)-1) :
+    for i in range(1,len(dubins_base)-1) :
         cartesian_path, _, _ = dubins.plan(dubins_base[i], dubins_base[i+1], kappa_)
         path_x, path_y, path_yaw = cartesian_path
         plt.plot(path_x, path_y, 'g-')
@@ -335,12 +335,14 @@ def main():
 
 
 def hybrid_a_star():
+    #goal= [x,y ,yaw]
     start, goal, obstacle_list, space = map()
     opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.02)
     
     out_path = Path()
     out_path.header.frame_id = '/map'
 
+    #message
     for waypoint in opt_path :
         path_x = waypoint[0]
         path_y = waypoint[1]
@@ -350,47 +352,17 @@ def hybrid_a_star():
         read_pose.pose.orientation.w = 1
         out_path.poses.append(read_pose)
 
-    return opt_path, out_path
-
-# for publishing Topic
-def get_hybrid_a_star_dubins_global_path():
-
-    start, goal, obstacle_list, space = map()
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.02)
-
-    print("Optimal path found!")
-    len_opt_path = len(opt_path)
-
-    #Dubins
+    #마지막 point 에서 주차goal 까지 dubins로 경로 생성.
     dubins = Dubins()
     kappa_ = .5/2.0
-    dubins_base = [opt_path[0],opt_path[int(0.3*len_opt_path)],opt_path[int(0.6*len_opt_path)],opt_path[-1]]
-    dubins_x = []
-    dubins_y = []
+    cartesian_path, _,_ = dubins.plan(opt_path[-1],goal[:2],kappa_)
+    path_x , path_y , path_yaw = cartesian_path
+    dubins_path = []
+    for i in range(len(path_x)) :
+        opt_path.append([path_x[i],path_y[i]])
+        # dubins_path.append([path_x[i],path_y[i]])
 
-    #포인트 간의 dubins path 를 추출해줌
-    #global path = x,y,
-    for i in range(len(dubins_base)-1) :
-        cartesian_path, _, _ = dubins.plan(dubins_base[i], dubins_base[i+1], kappa_)
-        path_x, path_y, path_yaw = cartesian_path
-        dubins_x += path_x
-        dubins_y += path_y
-
-    # print(dubins_x,dubins_y)
-    dubins_waypoint = zip(dubins_x,dubins_y)
-
-    out_path = Path()
-    out_path.header.frame_id = '/map'
-
-    for waypoint in dubins_waypoint :
-        path_x = waypoint[0]
-        path_y = waypoint[1]
-        read_pose = PoseStamped()
-        read_pose.pose.position.x = path_x
-        read_pose.pose.position.y = path_y
-        read_pose.pose.orientation.w = 1
-        out_path.poses.append(read_pose)
-    return dubins_waypoint, out_path
+    return opt_path, out_path, dubins_path
 
 if __name__ == "__main__":
     main()
