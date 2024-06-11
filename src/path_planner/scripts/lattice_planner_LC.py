@@ -199,6 +199,7 @@ class latticePlanner:
                     for predicted_path_key, (global_predicted_path_list, prob) in self.vehicle_paths.items():
                         total_weight = 0
                         npc_len = len(global_predicted_path_list)
+                        # if predicted_path_key == "right_change":
                         for n in range(min(path_len, npc_len)):  # 길이 비교
                             vehicle_circle_center = out_path[path_num].poses[n].pose.position
                             npc_circle_center = global_predicted_path_list[n]
@@ -206,10 +207,13 @@ class latticePlanner:
 
                             if is_circle_overlap(vehicle_circle_center, npc_point, 1):
                                 total_weight += 20
+                                # print("A")
                             elif is_circle_overlap(vehicle_circle_center, npc_point, 2.5):
                                 total_weight += 10
+                                # print("B")
                             elif is_circle_overlap(vehicle_circle_center, npc_point, 5.0):
                                 total_weight += 5
+                                # print("C")
 
                             # risk 계산 및 저장
                             distance_squared = pow(vehicle_circle_center.x - npc_point.x, 2) + pow(vehicle_circle_center.y - npc_point.y, 2)
