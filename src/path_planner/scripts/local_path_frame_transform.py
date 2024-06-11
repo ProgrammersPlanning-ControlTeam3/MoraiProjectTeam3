@@ -89,18 +89,15 @@ class PathPub:
         if d_target is None:
             d_target = d
 
-        # 조정된 d_target 계산
-        # d_adjustment = 0  # 중앙에 맞추기 위해 조정할 값
-        # d_target += d_adjustment
-
+        # 5차 곡선 생성
         T = 1.0
-        s_coeff = self.quintic_polynomial_coeffs(s, 0, 0, s_target, 0, 0, T)
-        d_coeff = self.quintic_polynomial_coeffs(d, 0, 0, d_target, 0, 0, T)
+        s_coeff = self.generate_5th_order_polynomial(s, s_target, 0, T)
+        d_coeff = self.generate_5th_order_polynomial(d, d_target, 0, T)
 
         for i in range(self.local_path_size):
             t = i * (T / self.local_path_size)
-            s_val = self.quintic_polynomial_value(s_coeff, t)
-            d_val = self.quintic_polynomial_value(d_coeff, t)
+            s_val = self.calculate_polynomial(s_coeff, t)
+            d_val = self.calculate_polynomial(d_coeff, t)
 
             if s_val > maps[-1]:
                 s_val = maps[-1]
@@ -110,22 +107,20 @@ class PathPub:
 
         return local_path_points
 
+    def generate_5th_order_polynomial(self, ys, yf, xs, xf):
+        # 5차 곡선 계수 계산
+        if xf == 0:
+            return [ys, 0, 0, 0, 0, 0]  # xf가 0일 경우를 처리
+        a0 = ys
+        a1 = 0
+        a2 = 0
+        a3 = (10 * (yf - ys)) / (xf ** 3)
+        a4 = (-15 * (yf - ys)) / (xf ** 4)
+        a5 = (6 * (yf - ys)) / (xf ** 5)
+        return [a0, a1, a2, a3, a4, a5]
 
-    def quintic_polynomial_coeffs(self, xs, vxs, axs, xe, vxe, axe, T):
-        A = np.array([
-            [0, 0, 0, 0, 0, 1],
-            [T**5, T**4, T**3, T**2, T, 1],
-            [0, 0, 0, 0, 1, 0],
-            [5*T**4, 4*T**3, 3*T**2, 2*T, 1, 0],
-            [0, 0, 0, 2, 0, 0],
-            [20*T**3, 12*T**2, 6*T, 2, 0, 0]
-        ])
-        B = np.array([xs, xe, vxs, vxe, axs, axe])
-        X = np.linalg.solve(A, B)
-        return X
-
-    def quintic_polynomial_value(self, coeffs, t):
-        return coeffs[0]*t**5 + coeffs[1]*t**4 + coeffs[2]*t**3 + coeffs[3]*t**2 + coeffs[4]*t + coeffs[5]
+    def calculate_polynomial(self, a, x_vals):
+        return a[0] + a[1] * x_vals + a[2] * x_vals**2 + a[3] * x_vals**3 + a[4] * x_vals**4 + a[5] * x_vals**5
 
 if __name__ == '__main__':
     try:
