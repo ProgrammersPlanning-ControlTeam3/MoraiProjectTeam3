@@ -23,7 +23,7 @@ sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 #print(sys.path)
 
 from control.scripts.pid_controller import pidControl
-from control.scripts.lateral_controller import stanley
+from control.scripts.lateral_controller_stanley import stanley
 from control.scripts.longitudinal_controller import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
 

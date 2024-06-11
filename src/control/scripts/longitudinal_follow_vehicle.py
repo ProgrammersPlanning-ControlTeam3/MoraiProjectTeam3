@@ -33,6 +33,8 @@ class FollowVehicle:
 
         self.time_gap = 1.5
 
+
+    ## Lattice path의 idx가 2, 6 일때만 감속하도록?
     def control_velocity(self, target_velocity):
 
         desired_velocity = target_velocity
