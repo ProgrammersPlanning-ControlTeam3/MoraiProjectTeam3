@@ -19,6 +19,8 @@ current_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_path)
 
 from lib.mgeo.class_defs import *
+
+# sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 sys.path.insert(0, '/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src')
 #print(sys.path)
 
@@ -29,6 +31,7 @@ from control.scripts.longitudinal_controller import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
 from control.scripts.longitudinal_follow_vehicle import FollowVehicle
 
+arrivedParkingLot = False
 class rule_based_planner:
     def __init__(self):
 
@@ -78,9 +81,9 @@ class rule_based_planner:
                 break
             else:
                 pass
-
         rate = rospy.Rate(30)  # 30hz
         print("path_info", self.is_path, "odom_info", self.is_odom, "status info", self.is_status)
+
         while not rospy.is_shutdown():
             if self.is_path == True and self.is_odom == True and self.is_status == True: # Everything is OK
                 prev_time = time.time()
