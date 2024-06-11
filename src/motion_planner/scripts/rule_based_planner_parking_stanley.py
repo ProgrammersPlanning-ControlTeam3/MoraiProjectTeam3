@@ -30,6 +30,7 @@ from control.scripts.longitudinal_controller import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
 from control.scripts.longitudinal_follow_vehicle import FollowVehicle
 
+arrivedParkingLot = False
 class rule_based_planner:
     def __init__(self):
 
@@ -63,6 +64,7 @@ class rule_based_planner:
 
         self.target_velocity = 40 # morive max_speed": 60, default : 40
 
+        self.inParkingLot = False
         # 제어 시스템 및 알고리즘 초기화 부분
         self.pid = pidControl() # PID Control
         self.vel_planning = velocityPlanning(self.target_velocity / 3.6, 0.15) # Velocity Control
@@ -94,6 +96,9 @@ class rule_based_planner:
                 ## TODO target_velocity -> 감속 (앞 차량이 있거나, 예측 경로와 겹칠 경우)
                 self.re_target_velocity = self.follow_vehicle.control_velocity(self.target_velocity)
 
+                if self.inParkingLot :
+                    self.target_velocity = 5
+                
                 # steering = self.stanley.calc_stanley_control()
                 # steering = self.pure_pursuit.calc_pure_pursuit()
                 # TODO tollgate area : No lattice path. Follow local path. Need to make follow local path method in stanley class
@@ -160,13 +165,24 @@ class rule_based_planner:
         _,_,self.vehicle_yaw=euler_from_quaternion(odom_quaternion)
         self.current_position.x=msg.pose.pose.position.x
         self.current_position.y=msg.pose.pose.position.y
+        if self.arrivedAtPoint() :
+            self.inParkingLot = True
+            
 
     def path_callback(self,msg):
         self.is_path=True
         self.path=msg
 
+    def get_dist(self, x1, y1, x2, y2):
+        distance = sqrt((x2 - x1)**2 + (y2 - y1)**2)
+        return distance
 
-
+    def arrivedAtPoint (self,x,y, gap = 1.0) :
+        x1, y1 = self.current_position.x , self.current_position.y
+        if self.get_dist(x1,y1,x,y) < gap :
+            return True
+        else:
+            return False
 
 
 if __name__ == '__main__':
