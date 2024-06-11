@@ -42,7 +42,7 @@ class PathPub:
         self.y = msg.pose.pose.position.y
         orientation = msg.pose.pose.orientation
         _, _, self.yaw = euler_from_quaternion([orientation.x, orientation.y, orientation.z, orientation.w])
-        print(self.x, self.y, self.yaw)
+        # print(self.x, self.y, self.yaw)
 
     def global_path_callback(self, msg):
         self.global_path_msg = msg
