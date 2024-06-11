@@ -115,50 +115,6 @@ class latticePlanner:
                     return npc
         return None
 
-    def checkObject_npc(self, ref_path, object_data):
-
-        def is_collision_distance(path_pose, obj_position, threshold):
-            dis = sqrt(pow(path_pose.x - obj_position.x, 2) + pow(path_pose.y - obj_position.y, 2))
-            return dis < threshold
-
-        vehicle_position = ref_path.poses[0].pose.position
-        theta = atan2(ref_path.poses[1].pose.position.y - vehicle_position.y,
-                      ref_path.poses[1].pose.position.x - vehicle_position.x)
-
-        local_path = [self.transform_to_local(pose.pose.position, vehicle_position, theta) for pose in ref_path.poses]
-
-        # npc's position
-        for local_pose in local_path:
-            for npc in object_data.npc_list:
-                local_npc_position = self.transform_to_local(npc.position, vehicle_position, theta)
-                if is_collision_distance(local_pose, local_npc_position, 2.35):
-                    print("NPC")
-                    return True
-
-        return False
-
-    def checkObject_npc_path(self, ref_path):
-        
-        def is_path_overlap(path_pose, predicted_pose, threshold):
-            dis = sqrt(pow(path_pose.x - predicted_pose.x, 2) + pow(path_pose.y - predicted_pose.y, 2))
-            return dis < threshold
-
-        vehicle_position = ref_path.poses[0].pose.position
-        theta = atan2(ref_path.poses[1].pose.position.y - vehicle_position.y,
-                      ref_path.poses[1].pose.position.x - vehicle_position.x)
-
-        local_path = [self.transform_to_local(pose.pose.position, vehicle_position, theta) for pose in ref_path.poses]
-
-        # npc's predicted path
-        if self.prediction_path is not None:
-            for local_pose in local_path:
-                for predicted_path in self.prediction_path.path_list:
-                    for predicted_pose in predicted_path.path:
-                        local_predicted_position = self.transform_to_local(Point(x=predicted_pose.x, y=predicted_pose.y, z=0), vehicle_position, theta)
-                        if is_path_overlap(local_pose, local_predicted_position, 2.35):
-                            print("Path")
-                            return True
-        return False    
 
     def get_npc_ids_in_range(self, ref_path, object_data, x_min, x_max, y_min, y_max):
         forward_vehicle = ref_path.poses[0].pose.position
