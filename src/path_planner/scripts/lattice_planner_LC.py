@@ -133,17 +133,25 @@ class latticePlanner:
     def collision_check(self, object_data, out_path):
         selected_lane = -1
         lane_weight = [5, 2, 200, 5, 0, 200]
-        lane_risk = [0] * len(lane_weight)
         maneuver_weights = [{"lane_keeping": 0, "right_change": 0, "left_change": 0} for _ in range(len(out_path))]
 
-        def is_circle_overlap(center1, center2, radius):
-            dis = sqrt(pow(center1.x - center2.x, 2) + pow(center1.y - center2.y, 2))
-            return dis < radius * 2
+        def calculate_risk(center1, center2):
+            distance_squared = pow(center1.x - center2.x, 2) + pow(center1.y - center2.y, 2)
+            distance = pow(distance_squared, 0.5)
+            risk = 1 / distance_squared if distance_squared != 0 else float('inf')
+            if distance <= 0.5:
+                risk += 1
+            return risk
 
+        # Forward vehicle check
         forward_vehicle_check = self.get_forward_vehicle(self.local_path, object_data)
         forward_vehicle_id = None
         if forward_vehicle_check is not None:
-            forward_vehicle_id = forward_vehicle_check.unique_id
+            if self.foward_vehicle_speed > 15:
+                path_length = min(self.target_velocity, self.status_msg.velocity.x)
+            else:
+                path_length = self.target_velocity
+            short_path_length = path_length * 0.6
 
         npc_ids_in_range = self.get_npc_ids_in_range(self.local_path, object_data, -40, 50, -5, 5)
 
@@ -154,49 +162,60 @@ class latticePlanner:
                 path_len = len(out_path[path_num].poses)
                 for npc_id in npc_ids_in_range:
                     for predicted_path_key, (global_predicted_path_list, prob) in self.vehicle_paths.items():
-                        total_weight = 0
+                        total_risk = 0
                         npc_len = len(global_predicted_path_list)
-                        # if predicted_path_key == "right_change":
                         for n in range(min(path_len, npc_len)):  # 길이 비교
                             vehicle_circle_center = out_path[path_num].poses[n].pose.position
                             npc_circle_center = global_predicted_path_list[n]
                             npc_point = Point(x=npc_circle_center.x, y=npc_circle_center.y, z=0)
 
-                            if is_circle_overlap(vehicle_circle_center, npc_point, 1):
-                                total_weight += 30
-                                # print("A")
-                            elif is_circle_overlap(vehicle_circle_center, npc_point, 2.5):
-                                total_weight += 20
-                                # print("B")
-                            elif is_circle_overlap(vehicle_circle_center, npc_point, 5.0):
-                                total_weight += 10
-                                # print("C")
+                            risk = calculate_risk(vehicle_circle_center, npc_point)
+                            total_risk += risk
 
-                            # risk 계산 및 저장
-                            distance_squared = pow(vehicle_circle_center.x - npc_point.x, 2) + pow(vehicle_circle_center.y - npc_point.y, 2)
-                            lane_risk[path_num] += distance_squared
-
-                        maneuver_weights[path_num][predicted_path_key] += total_weight
+                        maneuver_weights[path_num][predicted_path_key] += total_risk
 
             # 각 경로에 대한 총 weight를 확률을 곱하여 lane_weight에 반영
             for path_num in range(len(out_path)):
                 lane_weight[path_num] += maneuver_weights[path_num]["lane_keeping"] * self.vehicle_probability_LK
                 lane_weight[path_num] += maneuver_weights[path_num]["right_change"] * self.vehicle_probability_LR
                 lane_weight[path_num] += maneuver_weights[path_num]["left_change"] * self.vehicle_probability_LL
-                # print("[",path_num,"LK ] : ", maneuver_weights[path_num]["lane_keeping"])
-                # print("[",path_num,"LR ] : ", maneuver_weights[path_num]["right_change"])
-                # print("[",path_num,"LL ] : ", maneuver_weights[path_num]["left_change"])
+
+                # print("[", path_num, "LK ] : ", maneuver_weights[path_num]["lane_keeping"])
+                # print("[", path_num, "LR ] : ", maneuver_weights[path_num]["right_change"])
+                # print("[", path_num, "LL ] : ", maneuver_weights[path_num]["left_change"])
                 # print("\n")
 
-        selected_lane = lane_weight.index(min(lane_weight))
+        if forward_vehicle_check is not None and npc_ids_in_range:
+            # Calculate distance between the first points
+            vehicle_circle_center = out_path[0].poses[0].pose.position
+            npc_circle_center = self.vehicle_paths['lane_keeping'][0][0]
+            npc_point = Point(x=npc_circle_center.x, y=npc_circle_center.y, z=0)
+
+            distance = pow(pow(vehicle_circle_center.x - npc_point.x, 2) + pow(vehicle_circle_center.y - npc_point.y, 2), 0.5)
+
+            if distance < short_path_length:
+                selected_lanes = [0, 1, 2]
+            else:
+                selected_lanes = [3, 4, 5]
+
+            lane_weight_selected = {lane: lane_weight[lane] for lane in selected_lanes}
+            selected_lane = min(lane_weight_selected, key=lane_weight_selected.get)
+        else:
+            selected_lane = lane_weight.index(min(lane_weight))
 
         print("Lane change : ", selected_lane)
-        # print("Low Risk : ", lane_risk.index(max(lane_risk)))
+        print("0 : ", lane_weight[0])
+        print("1 : ", lane_weight[1])
+        print("2 : ", lane_weight[2])
+        print("3 : ", lane_weight[3])
+        print("4 : ", lane_weight[4])
+        print("5 : ", lane_weight[5])
+        print("6 : ", lane_weight[6])
+        print("7 : ", lane_weight[7])
+        print("\n")
 
-        # for i in range(len(out_path)):
-        #     print(f"Lane {i} weights - LK: {maneuver_weights[i]['lane_keeping']} * {self.vehicle_probability_LK}, LR: {maneuver_weights[i]['right_change']} * {self.vehicle_probability_LR}, LL: {maneuver_weights[i]['left_change']} * {self.vehicle_probability_LL}")
-        # print("\n")
         return selected_lane
+
 
 
 
@@ -289,7 +308,7 @@ class latticePlanner:
                     goal_d_with_offset = vehicle_d + lane_offset
 
                     # forward vehicle's speed based target point -> changed to controlled velocity (전방향 차량 속도에 따라 제어된 속도값 사용 : 현재 차량의 속도값 사용하게 됨)
-                    if self.foward_vehicle_speed > 5:
+                    if self.foward_vehicle_speed > 15:
                         goal_s_with_offset = vehicle_s + min(self.target_velocity, self.status_msg.velocity.x) * time_offset
                     else :
                         goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
