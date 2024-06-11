@@ -28,6 +28,7 @@ class latticePlanner:
         rospy.Subscriber('/Object_topic/hmm_predicted_path_topic', PredictedHMMPath, self.prediction_path_callback)
 
         self.lattice_path_pub = rospy.Publisher('/lattice_path', Path, queue_size=1)
+        self.selected_lane_pub = rospy.Publisher('/selected_lane', Int32, queue_size=1)
 
         self.is_path = False
         self.is_status = False
@@ -60,7 +61,7 @@ class latticePlanner:
 
                 # (7)  lattice 경로 메세지 Publish
                 self.lattice_path_pub.publish(lattice_path[lattice_path_index])
-
+                self.selected_lane_pub.publish(lattice_path_index)
             rate.sleep()
 
 
