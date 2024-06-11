@@ -21,7 +21,7 @@ class FollowVehicle:
         rospy.Subscriber('/Object_topic/tracked_object_path_topic', PredictedObjectPathList, self.object_path_callback)
         rospy.Subscriber('/Object_topic/deleted_object_id', Int32, self.deleted_object_callback)
         rospy.Subscriber("/lattice_path", Path, self.lattice_path_callback)
-        rospy.Subscriber("/selected_lane", Path, self.selected_lane_callback)
+        rospy.Subscriber("/selected_lane", Int32, self.selected_lane_callback)
 
         self.is_status = False
         self.is_obj = False
@@ -36,16 +36,14 @@ class FollowVehicle:
         self.time_gap = 1.5
 
 
-    ## Lattice path의 idx가 2, 6 일때만 감속하도록?
     def control_velocity(self, target_velocity):
-
         desired_velocity = target_velocity
 
         is_forward, forward_dist, forward_speed = self.forward_vehicle(self.lattice_path, self.object_data)
-        if is_forward and (self.selected_lane == 2 or self.selected_lane == 6):
+        if is_forward and (self.selected_lane == 1 or self.selected_lane == 4):
             if forward_dist < self.time_gap * self.status_msg.velocity.x:
                 desired_velocity = min(desired_velocity, forward_speed - 2.0)
-        elif self.checkObject_npc_path(self.lattice_path, self.object_path) and (self.selected_lane == 2 or self.selected_lane == 6):
+        elif self.checkObject_npc_path(self.lattice_path, self.object_path) and (self.selected_lane == 1 or self.selected_lane == 4):
             desired_velocity = target_velocity - 5.0
 
         return desired_velocity

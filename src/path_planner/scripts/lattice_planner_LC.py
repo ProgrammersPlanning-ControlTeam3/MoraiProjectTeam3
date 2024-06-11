@@ -61,7 +61,7 @@ class latticePlanner:
 
                 # (7)  lattice 경로 메세지 Publish
                 self.lattice_path_pub.publish(lattice_path[lattice_path_index])
-                self.selected_lane_pub.publish(lattice_path_index)
+                self.selected_lane_pub.publish(Int32(data=lattice_path_index))
             rate.sleep()
 
 
@@ -132,7 +132,7 @@ class latticePlanner:
 
     def collision_check(self, object_data, out_path):
         selected_lane = -1
-        lane_weight = [15, 5, 0, 500, 15, 5, 0, 500]
+        lane_weight = [5, 2, 500, 5, 0, 500]
         lane_risk = [0] * len(lane_weight)
         maneuver_weights = [{"lane_keeping": 0, "right_change": 0, "left_change": 0} for _ in range(len(out_path))]
 
@@ -163,13 +163,13 @@ class latticePlanner:
                             npc_point = Point(x=npc_circle_center.x, y=npc_circle_center.y, z=0)
 
                             if is_circle_overlap(vehicle_circle_center, npc_point, 1):
-                                total_weight += 20
+                                total_weight += 30
                                 # print("A")
                             elif is_circle_overlap(vehicle_circle_center, npc_point, 2.5):
-                                total_weight += 10
+                                total_weight += 20
                                 # print("B")
                             elif is_circle_overlap(vehicle_circle_center, npc_point, 5.0):
-                                total_weight += 5
+                                total_weight += 10
                                 # print("C")
 
                             # risk 계산 및 저장
@@ -183,14 +183,14 @@ class latticePlanner:
                 lane_weight[path_num] += maneuver_weights[path_num]["lane_keeping"] * self.vehicle_probability_LK
                 lane_weight[path_num] += maneuver_weights[path_num]["right_change"] * self.vehicle_probability_LR
                 lane_weight[path_num] += maneuver_weights[path_num]["left_change"] * self.vehicle_probability_LL
-                print("[",path_num,"LK ] : ", maneuver_weights[path_num]["lane_keeping"])
-                print("[",path_num,"LR ] : ", maneuver_weights[path_num]["right_change"])
-                print("[",path_num,"LL ] : ", maneuver_weights[path_num]["left_change"])
-                print("\n")
+                # print("[",path_num,"LK ] : ", maneuver_weights[path_num]["lane_keeping"])
+                # print("[",path_num,"LR ] : ", maneuver_weights[path_num]["right_change"])
+                # print("[",path_num,"LL ] : ", maneuver_weights[path_num]["left_change"])
+                # print("\n")
 
         selected_lane = lane_weight.index(min(lane_weight))
 
-        # print("Lane change : ", selected_lane)
+        print("Lane change : ", selected_lane)
         # print("Low Risk : ", lane_risk.index(max(lane_risk)))
 
         # for i in range(len(out_path)):
@@ -279,7 +279,7 @@ class latticePlanner:
 
             goal_s, goal_d = get_frenet(global_ref_end_point[0], global_ref_end_point[1], mapx, mapy)
 
-            lane_offsets = [4, 3.5, 0, -3.5]
+            lane_offsets = [4, 0, -3.5]
             time_offsets = [0.6, 1.0]
 
             for time_offset in time_offsets:
