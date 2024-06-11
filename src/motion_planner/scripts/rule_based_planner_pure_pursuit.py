@@ -24,7 +24,7 @@ sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 
 from control.scripts.pid_controller import pidControl
 from control.scripts.lateral_controller_pure_pursuit import pure_pursuit
-from control.scripts.longitudinal_controller import velocityPlanning
+from control.scripts.longitudinal_controller_curvebased import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
 
 class rule_based_planner:

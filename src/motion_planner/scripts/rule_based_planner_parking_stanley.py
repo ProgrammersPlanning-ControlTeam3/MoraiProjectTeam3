@@ -25,9 +25,9 @@ sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 from control.scripts.pid_controller import pidControl
 from control.scripts.stanly_parking import stanley_parking
 # from control.scripts.lateral_controller import pure_pursuit
-from control.scripts.longitudinal_controller import velocityPlanning
+from control.scripts.longitudinal_controller_curvebased import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
-from control.scripts.longitudinal_follow_vehicle import FollowVehicle
+from control.scripts.longitudinal_controller_follow_vehicle import FollowVehicle
 
 class rule_based_planner:
     def __init__(self):
