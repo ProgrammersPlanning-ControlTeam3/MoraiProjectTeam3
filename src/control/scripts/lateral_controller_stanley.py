@@ -114,17 +114,13 @@ class stanley:
         return False
 
 
-    def global_to_local(self, global_path, current_position, current_yaw):
-        local_path = []
-        for pose in global_path.poses:
-            dx = pose.pose.position.x - current_position.x
-            dy = pose.pose.position.y - current_position.y
-
-            local_x = dx * cos(-current_yaw) - dy * sin(-current_yaw)
-            local_y = dx * sin(-current_yaw) + dy * cos(-current_yaw)
-
-            local_path.append((local_x, local_y))
-        return local_path
+    def transform_to_local(self, global_position, reference_position, reference_theta):
+        translation = np.array([global_position.x - reference_position.x,
+                                global_position.y - reference_position.y])
+        rotation_matrix = np.array([[cos(-reference_theta), -sin(-reference_theta)],
+                                    [sin(-reference_theta), cos(-reference_theta)]])
+        local_position = rotation_matrix.dot(translation)
+        return Point(x=local_position[0], y=local_position[1], z=0)
 
 
     def calc_stanley_control(self):

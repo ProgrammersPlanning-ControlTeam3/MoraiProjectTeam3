@@ -24,7 +24,7 @@ sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 
 from control.scripts.pid_controller import pidControl
 from control.scripts.lateral_controller_stanley import stanley
-# from control.scripts.lateral_controller import pure_pursuit
+from control.scripts.lateral_controller_PID import pid_feedforward
 from control.scripts.longitudinal_controller_curvebased import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
 from control.scripts.longitudinal_controller_follow_vehicle import FollowVehicle
@@ -66,7 +66,8 @@ class rule_based_planner:
         # 제어 시스템 및 알고리즘 초기화 부분
         self.pid = pidControl() # PID Control
         self.vel_planning = velocityPlanning(self.target_velocity / 3.6, 0.15) # Velocity Control
-        self.stanley = stanley() 
+        self.stanley = stanley()
+        self.pid_feedforward = pid_feedforward()
         self.follow_vehicle = FollowVehicle()
         # self.selected_path = latticePlanner()
         # self.pure_pursuit = pure_pursuit() # Pure Pursuit control
@@ -101,7 +102,7 @@ class rule_based_planner:
                 # steering = self.stanley.calc_stanley_control_local()
 
                 if (self.status_msg.position.y < 1300):
-                    steering = self.stanley.calc_stanley_control_local()
+                    steering = self.pid_feedforward.calc_pid_feedforward()
                     self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
 
                 else:

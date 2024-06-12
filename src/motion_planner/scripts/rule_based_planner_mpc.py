@@ -18,16 +18,16 @@ import sys
 current_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_path)
 
-from lib.mgeo.class_defs import *
+# from lib.mgeo.class_defs import *
 sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 #print(sys.path)
 
 from control.scripts.pid_controller import pidControl
 from control.scripts.lateral_controller_MPC import MPCController
 # from control.scripts.lateral_controller import pure_pursuit
-from control.scripts.longitudinal_controller import velocityPlanning
+from control.scripts.longitudinal_controller_curvebased import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
-from control.scripts.longitudinal_follow_vehicle import FollowVehicle
+from control.scripts.longitudinal_controller_follow_vehicle import FollowVehicle
 
 class rule_based_planner:
     def __init__(self):
@@ -91,7 +91,7 @@ class rule_based_planner:
                 self.target_velocity = self.velocity_list[self.current_waypoint] * 3.6
 
                 ## TODO target_velocity -> 감속 (앞 차량이 있거나, 예측 경로와 겹칠 경우)
-                self.re_target_velocity = self.follow_vehicle.control_velocity(self.target_velocity)
+                self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
                 # steering = self.stanley.calc_stanley_control()
                 # steering = self.pure_pursuit.calc_pure_pursuit()
                 # TODO tollgate area : No lattice path. Follow local path. Need to make follow local path method in stanley class
