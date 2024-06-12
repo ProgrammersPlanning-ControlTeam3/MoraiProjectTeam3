@@ -337,7 +337,7 @@ def main():
 def hybrid_a_star():
     #goal= [x,y ,yaw]
     start, goal, obstacle_list, space = map()
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.02)
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
     
     out_path = Path()
     out_path.header.frame_id = '/map'
@@ -355,17 +355,18 @@ def hybrid_a_star():
     #마지막 point 에서 주차goal 까지 dubins로 경로 생성.
     dubins = Dubins()
     kappa_ = .5/2.0
-    cartesian_path, _,_ = dubins.plan(opt_path[-1],goal[:2],kappa_)
+    cartesian_path, _,_ = dubins.plan(opt_path[-1],goal,kappa_)
     path_x , path_y , path_yaw = cartesian_path
     dubins_path = []
     for i in range(len(path_x)) :
         opt_path.append([path_x[i],path_y[i]])
         # dubins_path.append([path_x[i],path_y[i]])
-
+    print(dubins_path)
     return opt_path, out_path, dubins_path
 
 if __name__ == "__main__":
-    main()
+    hybrid_a_star()
+    # main()
 
 
 
