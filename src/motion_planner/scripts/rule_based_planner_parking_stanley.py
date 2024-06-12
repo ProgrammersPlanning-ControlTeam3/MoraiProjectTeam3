@@ -19,13 +19,13 @@ current_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_path)
 
 from lib.mgeo.class_defs import *
-# sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
+sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 sys.path.insert(0, '/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src')
 #print(sys.path)
 
 from control.scripts.pid_controller import pidControl
 from control.scripts.stanley_parking import stanley_parking
-# from control.scripts.lateral_controller import pure_pursuit
+from control.scripts.lateral_controller import stanley
 from control.scripts.longitudinal_controller import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
 from control.scripts.longitudinal_follow_vehicle import FollowVehicle
@@ -68,7 +68,8 @@ class rule_based_planner:
         # 제어 시스템 및 알고리즘 초기화 부분
         self.pid = pidControl() # PID Control
         self.vel_planning = velocityPlanning(self.target_velocity / 3.6, 0.15) # Velocity Control
-        self.stanley = stanley_parking() 
+        self.stanley = stanley() 
+        self.stanley_parking = stanley_parking()
         self.follow_vehicle = FollowVehicle()
         # self.pure_pursuit = pure_pursuit() # Pure Pursuit control
         # self.object_detector = object_detector() # Object Detection to avoid
@@ -96,9 +97,7 @@ class rule_based_planner:
                 ## TODO target_velocity -> 감속 (앞 차량이 있거나, 예측 경로와 겹칠 경우)
                 self.re_target_velocity = self.follow_vehicle.control_velocity(self.target_velocity)
 
-                if self.inParkingLot :
-                    self.target_velocity = 5
-                
+
                 # steering = self.stanley.calc_stanley_control()
                 # steering = self.pure_pursuit.calc_pure_pursuit()
                 # TODO tollgate area : No lattice path. Follow local path. Need to make follow local path method in stanley class
@@ -107,6 +106,13 @@ class rule_based_planner:
                 steering = self.stanley.calc_stanley_control_local()
 
                 self.ctrl_cmd_msg.steering = steering #0.0 last
+
+                if self.inParkingLot :
+                    self.current_waypoint = self.stanley_parking.get_current_waypoint(self.status_msg, self.global_path)
+                    steering = self.stanley_parking.calc_stanley_control_local()
+                    # print("In ParkingLot")
+                    self.re_target_velocity = 10
+                
 
                 output = self.pid.pid(self.re_target_velocity, self.status_msg.velocity.x * 3.6)
 
@@ -165,7 +171,9 @@ class rule_based_planner:
         _,_,self.vehicle_yaw=euler_from_quaternion(odom_quaternion)
         self.current_position.x=msg.pose.pose.position.x
         self.current_position.y=msg.pose.pose.position.y
-        if self.arrivedAtPoint() :
+        # print(self.inParkingLot)
+        if self.arrivedAtPoint(7.23,1066.8476) :
+            # print("Hi ParkingLot")
             self.inParkingLot = True
             
 
@@ -177,7 +185,7 @@ class rule_based_planner:
         distance = sqrt((x2 - x1)**2 + (y2 - y1)**2)
         return distance
 
-    def arrivedAtPoint (self,x,y, gap = 1.0) :
+    def arrivedAtPoint (self,x, y, gap = 5.0) :
         x1, y1 = self.current_position.x , self.current_position.y
         if self.get_dist(x1,y1,x,y) < gap :
             return True

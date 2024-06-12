@@ -20,12 +20,13 @@ sys.path.append(current_path)
 
 from lib.mgeo.class_defs import *
 
-# sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
-sys.path.insert(0, '/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src')
+sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
+# sys.path.insert(0, '/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src')
 #print(sys.path)
 
 from control.scripts.pid_controller import pidControl
 from control.scripts.lateral_controller import stanley
+
 # from control.scripts.lateral_controller import pure_pursuit
 from control.scripts.longitudinal_controller import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
