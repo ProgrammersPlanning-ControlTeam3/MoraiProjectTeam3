@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import time
 import sys
 sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
-from control.scripts.controller_utils import unified_calculator, plot_paths, get_waypoint, is_obstacle_nearby
+from control.scripts.controller_utils import unified_calculator, plot_paths, get_waypoint
 
 class stanley:
     def __init__(self):

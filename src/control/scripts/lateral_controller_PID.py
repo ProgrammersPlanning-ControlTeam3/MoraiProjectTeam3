@@ -7,6 +7,7 @@ import numpy as np
 from tf.transformations import euler_from_quaternion
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry, Path
+from std_msgs.msg import Int32
 from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
 import matplotlib.pyplot as plt
 import time
@@ -21,11 +22,13 @@ class pid_feedforward:
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
         rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_callback)
+        rospy.Subscriber("/selected_lane", Int32, self.selected_lane_callback)
 
         self.is_path = False
         self.is_odom = False
         self.is_status = False
         self.is_global_path = False
+        self.is_selected_lane = False
 
         self.forward_point = Point()
         self.current_postion = Point()
@@ -100,6 +103,10 @@ class pid_feedforward:
         self.is_status = True
         self.status_msg = msg
 
+    def selected_lane_callback(self, msg):
+        self.is_selected_lane = True
+        self.selected_lane = msg
+
 
     def global_to_local(self, global_path, current_position, current_yaw):
         local_path = []
@@ -133,7 +140,9 @@ class pid_feedforward:
         lookahead_idx = closest_idx
         # print(len(self.path.poses))
 
-        if self.is_obstacle_nearby():
+        # if self.is_obstacle_nearby():
+        if self.selected_lane.data != 4 and self.selected_lane.data != 1 :
+
             for i in range(closest_idx, len(self.path.poses)):
                 global_position = self.path.poses[i].pose.position
                 local_position = self.transform_to_local(global_position, self.current_postion, self.vehicle_yaw)
@@ -207,16 +216,16 @@ class pid_feedforward:
 
 
 
-    def is_obstacle_nearby(self):
-        if not self.is_obj:
-            return False
+    # def is_obstacle_nearby(self):
+    #     if not self.is_obj:
+    #         return False
 
-        for obj in self.object_data.npc_list:
-            local_position = self.transform_to_local(obj.position, self.current_postion, self.vehicle_yaw)
-            distance = sqrt(local_position.x**2 + local_position.y**2)
-            if distance < 40 and local_position.x > -15 and abs(local_position.y) < 5 :
-                return True
-        return False
+    #     for obj in self.object_data.npc_list:
+    #         local_position = self.transform_to_local(obj.position, self.current_postion, self.vehicle_yaw)
+    #         distance = sqrt(local_position.x**2 + local_position.y**2)
+    #         if distance < 40 and local_position.x > -15 and abs(local_position.y) < 5 :
+    #             return True
+    #     return False
 
 
     def get_current_waypoint(self, ego_status, global_path):
