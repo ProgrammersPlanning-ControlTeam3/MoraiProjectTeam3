@@ -11,6 +11,8 @@ from nav_msgs.msg import Path
 
 current_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_path)
+
+sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 sys.path.append('/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src')
 
 
@@ -67,7 +69,7 @@ class dijkstra_path_pub :
         # self.global_path_parking_waypoint, _ = hybrid_a_star.get_hybrid_a_star_dubins_global_path()
 
         #global_path 경로
-        parking_waypoint, _ = hybrid_a_star.hybrid_a_star()
+        parking_waypoint, _, dubins_waypoint = hybrid_a_star.hybrid_a_star()
 
         # print(len(parking_waypoint))
 
