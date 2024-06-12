@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import time
 import sys
 sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
-from control.scripts.controller_utils import *
+from control.scripts.controller_utils import unified_calculator, plot_paths, get_waypoint, is_obstacle_nearby
 
 class pure_pursuit:
     def __init__(self):
@@ -69,18 +69,6 @@ class pure_pursuit:
         self.is_status = True
         self.status_msg = msg
 
-    def get_current_waypoint(self, ego_status, global_path):
-        min_dist = float('inf')
-        currnet_waypoint = -1
-        for i, pose in enumerate(global_path.poses):
-            dx = ego_status.position.x - pose.pose.position.x
-            dy = ego_status.position.y - pose.pose.position.y
-
-            dist = sqrt(pow(dx, 2) + pow(dy, 2))
-            if min_dist > dist:
-                min_dist = dist
-                currnet_waypoint = i
-        return currnet_waypoint
 
     def calc_pure_pursuit(self):
         if not self.is_path or not self.is_status:
@@ -128,24 +116,19 @@ class pure_pursuit:
         steering = atan2((2 * self.vehicle_length * sin(theta)), self.lfd)
         return steering
 
-    def calculate_statistics(self):
-        if len(self.errors) > 0:
-            mean_error = np.mean(self.errors)
-            max_error = np.max(self.errors)
-            variance = np.var(self.errors)
-            return mean_error, max_error, variance
-        return 0.0, 0.0, 0.0
 
-    def calculate_total_time(self):
-        if self.start_time is not None and self.end_time is not None:
-            return self.end_time - self.start_time
-        elif self.start_time is not None:
-            return time.time() - self.start_time
-        return 0.0
+    def get_current_waypoint(self, ego_status, global_path):
+        return get_waypoint(ego_status, global_path)
 
-    def set_end_time(self):
-        if self.end_time is None:
-            self.end_time = time.time()
+
+    def perform_calculations(self):
+        statistics = unified_calculator(errors=self.errors, operation='statistics')
+        total_time = unified_calculator(start_time=self.start_time, end_time=self.end_time, operation='total_time')
+        self.end_time = unified_calculator(end_time=self.end_time, operation='set_end_time')
+
+        return statistics, total_time
+
+
 
 
 
@@ -160,10 +143,10 @@ if __name__ == "__main__":
             pure_pursuit_controller.calc_pure_pursuit()
         rate.sleep()
 
-    # End the simulation by setting the end time
-    pure_pursuit_controller.set_end_time()
+    # End the simulation by setting the end time and perform calculations
+    statistics, total_time = pure_pursuit_controller.perform_calculations()
 
     if pure_pursuit_controller.global_path is not None:
-        mean_error, max_error, variance = pure_pursuit_controller.calculate_statistics()
+        mean_error, max_error, variance = statistics
         plot_paths(pure_pursuit_controller.global_path, pure_pursuit_controller.x_ego, pure_pursuit_controller.y_ego,
-                   pure_pursuit_controller.calculate_total_time(), variance, mean_error, max_error)
+                   total_time, variance, mean_error, max_error)

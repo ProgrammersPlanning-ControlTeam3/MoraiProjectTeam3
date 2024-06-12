@@ -3,7 +3,7 @@
 
 import rospy
 import numpy as np
-import math
+from math import cos, sin, sqrt, pow, atan2, pi
 from tf.transformations import euler_from_quaternion
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry, Path
@@ -13,7 +13,7 @@ import cvxpy as cp
 import time
 import sys
 sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
-from control.scripts.controller_utils import *
+from control.scripts.controller_utils import unified_calculator, plot_paths, get_waypoint, is_obstacle_nearby
 
 class MPCController:
     def __init__(self):
@@ -70,8 +70,8 @@ class MPCController:
             dx = pose.pose.position.x - current_position.x
             dy = pose.pose.position.y - current_position.y
 
-            local_x = dx * math.cos(-current_yaw) - dy * math.sin(-current_yaw)
-            local_y = dx * math.sin(-current_yaw) + dy * math.cos(-current_yaw)
+            local_x = dx * cos(-current_yaw) - dy * sin(-current_yaw)
+            local_y = dx * sin(-current_yaw) + dy * cos(-current_yaw)
 
             local_path.append((local_x, local_y))
         return local_path
@@ -145,6 +145,11 @@ class MPCController:
             return 0.0
 
 
+
+    def get_current_waypoint(self, ego_status, global_path):
+        return get_waypoint(ego_status, global_path)
+
+
     def calculate_error(self):
         if self.global_path and len(self.x_ego) > 0 and len(self.y_ego) > 0:
             ego_position = np.array([self.x_ego[-1], self.y_ego[-1]])
@@ -156,38 +161,12 @@ class MPCController:
                     min_dist = dist
             self.errors.append(min_dist)
 
+    def perform_calculations(self):
+        statistics = unified_calculator(errors=self.errors, operation='statistics')
+        total_time = unified_calculator(start_time=self.start_time, end_time=self.end_time, operation='total_time')
+        self.end_time = unified_calculator(end_time=self.end_time, operation='set_end_time')
 
-    def get_current_waypoint(self, ego_status, global_path):
-        min_dist = float('inf')
-        current_waypoint = -1
-        for i, pose in enumerate(global_path.poses):
-            dx = ego_status.position.x - pose.pose.position.x
-            dy = ego_status.position.y - pose.pose.position.y
-
-            dist = np.sqrt(pow(dx, 2) + pow(dy, 2))
-            if min_dist > dist:
-                min_dist = dist
-                current_waypoint = i
-        return current_waypoint
-
-    def calculate_statistics(self):
-        if len(self.errors) > 0:
-            mean_error = np.mean(self.errors)
-            max_error = np.max(self.errors)
-            variance = np.var(self.errors)
-            return mean_error, max_error, variance
-        return 0.0, 0.0, 0.0
-
-    def calculate_total_time(self):
-        if self.start_time is not None and self.end_time is not None:
-            return self.end_time - self.start_time
-        elif self.start_time is not None:
-            return time.time() - self.start_time
-        return 0.0
-
-    def set_end_time(self):
-        if self.end_time is None:
-            self.end_time = time.time()
+        return statistics, total_time
 
 
 if __name__ == "__main__":
@@ -202,9 +181,11 @@ if __name__ == "__main__":
             # Control commands should be published to the vehicle here
         rate.sleep()
 
-    mpc_controller.set_end_time()
+    # End the simulation by setting the end time and perform calculations
+    statistics, total_time = mpc_controller.perform_calculations()
 
     if mpc_controller.global_path is not None:
-        mean_error, max_error, variance = mpc_controller.calculate_statistics()
+        mean_error, max_error, variance = statistics
         plot_paths(mpc_controller.global_path, mpc_controller.x_ego, mpc_controller.y_ego,
-                   mpc_controller.calculate_total_time(), variance, mean_error, max_error)
+                   total_time, variance, mean_error, max_error)
+

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import rospy
-from math import sin, cos, atan2, sqrt, pi
+from math import cos, sin, sqrt, pow, atan2, pi
 import numpy as np
 from tf.transformations import euler_from_quaternion
 from geometry_msgs.msg import Point
@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import time
 import sys
 sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
-from control.scripts.controller_utils import *
+from control.scripts.controller_utils import unified_calculator, plot_paths, get_waypoint, is_obstacle_nearby
 
 class pid_feedforward:
     def __init__(self):
@@ -101,13 +101,17 @@ class pid_feedforward:
         self.status_msg = msg
 
 
-    def transform_to_local(self, global_position, reference_position, reference_theta):
-        translation = np.array([global_position.x - reference_position.x,
-                                global_position.y - reference_position.y])
-        rotation_matrix = np.array([[cos(reference_theta), sin(reference_theta)],
-                                    [-sin(reference_theta), cos(reference_theta)]])
-        local_position = rotation_matrix.dot(translation)
-        return Point(x=local_position[0], y=local_position[1], z=0)
+    def global_to_local(self, global_path, current_position, current_yaw):
+        local_path = []
+        for pose in global_path.poses:
+            dx = pose.pose.position.x - current_position.x
+            dy = pose.pose.position.y - current_position.y
+
+            local_x = dx * cos(-current_yaw) - dy * sin(-current_yaw)
+            local_y = dx * sin(-current_yaw) + dy * cos(-current_yaw)
+
+            local_path.append((local_x, local_y))
+        return local_path
 
 
     def compute_cte(self):
@@ -150,8 +154,6 @@ class pid_feedforward:
             self.errors.append(abs(cte))
 
         return cte
-
-
 
 
     def calc_pid_feedforward(self):
@@ -218,52 +220,35 @@ class pid_feedforward:
 
 
     def get_current_waypoint(self, ego_status, global_path):
-        min_dist = float('inf')
-        current_waypoint = -1
-        for i, pose in enumerate(global_path.poses):
-            dx = ego_status.position.x - pose.pose.position.x
-            dy = ego_status.position.y - pose.pose.position.y
-
-            dist = sqrt(pow(dx, 2) + pow(dy, 2))
-            if min_dist > dist:
-                min_dist = dist
-                current_waypoint = i
-        return current_waypoint
-
-    def calculate_statistics(self):
-        if len(self.errors) > 0:
-            mean_error = np.mean(self.errors)
-            max_error = np.max(self.errors)
-            variance = np.var(self.errors)
-            return mean_error, max_error, variance
-        return 0.0, 0.0, 0.0
-
-    def calculate_total_time(self):
-        if self.start_time is not None and self.end_time is not None:
-            return self.end_time - self.start_time
-        elif self.start_time is not None:
-            return time.time() - self.start_time
-        return 0.0
-
-    def set_end_time(self):
-        if self.end_time is None:
-            self.end_time = time.time()
+        return get_waypoint(ego_status, global_path)
 
 
-# if __name__ == "__main__":
-#     rospy.init_node('path_tracking_node', anonymous=True)
+    def perform_calculations(self):
+        statistics = unified_calculator(errors=self.errors, operation='statistics')
+        total_time = unified_calculator(start_time=self.start_time, end_time=self.end_time, operation='total_time')
+        self.end_time = unified_calculator(end_time=self.end_time, operation='set_end_time')
 
-#     pid_controller = pid_feedforward()
+        return statistics, total_time
 
-#     rate = rospy.Rate(10)  # 10 Hz
-#     while not rospy.is_shutdown():
-#         if pid_controller.is_path and pid_controller.is_odom and pid_controller.is_status:
-#             steering = pid_controller.calc_pid_feedforward()
-#         rate.sleep()
 
-#     pid_controller.set_end_time()
 
-#     if pid_controller.global_path is not None:
-#         mean_error, max_error, variance = pid_controller.calculate_statistics()
-#         plot_paths(pid_controller.global_path, pid_controller.x_ego, pid_controller.y_ego,
-#                    pid_controller.calculate_total_time(), variance, mean_error, max_error)
+
+if __name__ == "__main__":
+    rospy.init_node('path_tracking_node', anonymous=True)
+
+    pid_controller = pid_feedforward()
+
+    rate = rospy.Rate(10)  # 10 Hz
+    while not rospy.is_shutdown():
+        if pid_controller.is_path and pid_controller.is_odom and pid_controller.is_status:
+            steering = pid_controller.calc_pid_feedforward()
+        rate.sleep()
+
+    # End the simulation by setting the end time and perform calculations
+    statistics, total_time = pid_controller.perform_calculations()
+
+    if pid_controller.global_path is not None:
+        mean_error, max_error, variance = statistics
+        plot_paths(pid_controller.global_path, pid_controller.x_ego, pid_controller.y_ego,
+                   total_time, variance, mean_error, max_error)
+
