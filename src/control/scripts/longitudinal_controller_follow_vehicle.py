@@ -33,18 +33,31 @@ class FollowVehicle:
         self.is_lattice_path = False
         self.is_selected_lane = False
 
-        self.time_gap = 1.5
+        self.time_gap = 2.5
 
 
-    def control_velocity(self, target_velocity):
+    def control_velocity_avoid_vehicles(self, target_velocity):
         desired_velocity = target_velocity
-
         is_forward, forward_dist, forward_speed = self.forward_vehicle(self.lattice_path, self.object_data)
-        if is_forward and (self.selected_lane == 1 or self.selected_lane == 4):
-            if forward_dist < self.time_gap * self.status_msg.velocity.x:
-                desired_velocity = min(desired_velocity, forward_speed - 2.0)
-        elif self.checkObject_npc_path(self.lattice_path, self.object_path) and (self.selected_lane == 1 or self.selected_lane == 4):
+        if is_forward:
+            if self.selected_lane.data == 1:
+                if forward_dist < self.time_gap * self.status_msg.velocity.x:
+                    desired_velocity = min(desired_velocity, forward_speed - 5.0)
+                if forward_dist < 5:
+                    desired_velocity = -5.0
+
+        elif self.checkObject_npc_path(self.lattice_path, self.object_path) and self.selected_lane.data == 1:
             desired_velocity = target_velocity - 5.0
+
+        return desired_velocity
+
+
+    def control_velocity_follow_vehicles(self, target_velocity):
+        desired_velocity = target_velocity
+        is_forward, forward_dist, forward_speed = self.forward_vehicle(self.lattice_path, self.object_data)
+        if is_forward:
+            if forward_dist < self.time_gap * self.status_msg.velocity.x:
+                desired_velocity = min(desired_velocity, forward_speed - 5.0)
 
         return desired_velocity
 

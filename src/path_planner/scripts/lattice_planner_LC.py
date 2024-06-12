@@ -132,7 +132,7 @@ class latticePlanner:
 
     def collision_check(self, object_data, out_path):
         selected_lane = -1
-        lane_weight = [5, 2, 200, 5, 0, 200]
+        lane_weight = [5, 2, 80, 5, 0, 80]
         maneuver_weights = [{"lane_keeping": 0, "right_change": 0, "left_change": 0} for _ in range(len(out_path))]
 
         def calculate_risk(center1, center2):
@@ -187,32 +187,36 @@ class latticePlanner:
 
         if forward_vehicle_check is not None and npc_ids_in_range:
             # Calculate distance between the first points
-            vehicle_circle_center = out_path[0].poses[0].pose.position
-            npc_circle_center = self.vehicle_paths['lane_keeping'][0][0]
-            npc_point = Point(x=npc_circle_center.x, y=npc_circle_center.y, z=0)
+            if "lane_keeping" in self.vehicle_paths and len(self.vehicle_paths["lane_keeping"][0]) > 0:
+                vehicle_circle_center = out_path[0].poses[0].pose.position
+                npc_circle_center = self.vehicle_paths["lane_keeping"][0][0]
+                npc_point = Point(x=npc_circle_center.x, y=npc_circle_center.y, z=0)
 
-            distance = pow(pow(vehicle_circle_center.x - npc_point.x, 2) + pow(vehicle_circle_center.y - npc_point.y, 2), 0.5)
+                distance = pow(pow(vehicle_circle_center.x - npc_point.x, 2) + pow(vehicle_circle_center.y - npc_point.y, 2), 0.5)
 
-            if distance < short_path_length:
-                selected_lanes = [0, 1, 2]
-            else:
-                selected_lanes = [3, 4, 5]
+                if distance < short_path_length:
+                    selected_lanes = [0, 1, 2]
+                else:
+                    selected_lanes = [3, 4, 5]
 
-            lane_weight_selected = {lane: lane_weight[lane] for lane in selected_lanes}
-            selected_lane = min(lane_weight_selected, key=lane_weight_selected.get)
+                lane_weight_selected = {lane: lane_weight[lane] for lane in selected_lanes}
+                selected_lane = min(lane_weight_selected, key=lane_weight_selected.get)
         else:
             selected_lane = lane_weight.index(min(lane_weight))
 
         print("Lane change : ", selected_lane)
+        print("min weight : ", lane_weight[selected_lane])
         print("0 : ", lane_weight[0])
         print("1 : ", lane_weight[1])
         print("2 : ", lane_weight[2])
         print("3 : ", lane_weight[3])
         print("4 : ", lane_weight[4])
         print("5 : ", lane_weight[5])
-        print("6 : ", lane_weight[6])
-        print("7 : ", lane_weight[7])
         print("\n")
+
+        if lane_weight[selected_lane] >= 1000: # 모든 경로의 웨이트가 높은 경우 직진 -> 감속하기 위해서
+            selected_lane = 1
+            print("Lane change : ", selected_lane)
 
         return selected_lane
 
@@ -309,7 +313,7 @@ class latticePlanner:
 
                     # forward vehicle's speed based target point -> changed to controlled velocity (전방향 차량 속도에 따라 제어된 속도값 사용 : 현재 차량의 속도값 사용하게 됨)
                     if self.foward_vehicle_speed > 15:
-                        goal_s_with_offset = vehicle_s + min(self.target_velocity, self.status_msg.velocity.x) * time_offset
+                        goal_s_with_offset = vehicle_s + min(self.target_velocity, self.status_msg.velocity.x * 1.5) * time_offset
                     else :
                         goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
 
