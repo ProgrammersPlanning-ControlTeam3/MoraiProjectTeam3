@@ -7,11 +7,11 @@ from math import cos, sin, pi, sqrt, pow, atan2
 from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
 from prediction.msg import TrackedPoint, PredictedObjectPath, PredictedObjectPathList, TrackedObjectPose, TrackedObjectPoseList, PredictedHMM, PredictedHMMPath
 from geometry_msgs.msg import Point, PoseStamped, Point32
-from nav_msgs.msg import Path, Odometry
+from nav_msgs.msg import Path
 from std_msgs.msg import Int32
 
 import numpy as np
-from frame_transform import *   
+from frame_transform import *
 
 class latticePlanner:
     def __init__(self):
@@ -20,8 +20,6 @@ class latticePlanner:
         # (1) subscriber, publisher 선언
         rospy.Subscriber("/local_path", Path, self.path_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
-        rospy.Subscriber("/odom", Odometry, self.odom_callback)
-
         rospy.Subscriber("/Object_topic", ObjectStatusList, self.object_callback)
         rospy.Subscriber('/Object_topic/deleted_object_id', Int32, self.deleted_object_callback)
         rospy.Subscriber('/Object_topic/hmm_prediction', PredictedHMM, self.prediction_info_callback)
@@ -110,7 +108,7 @@ class latticePlanner:
         for local_pose in local_path:
             for npc in object_data.npc_list:
                 local_npc_position = self.transform_to_local(npc.position, forward_vehicle, forward_theta)
-                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1.75:
+                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1:
                     # print("Vehicle ahead : ", local_npc_position.x - local_pose.x)
                     # print(npc.velocity.x)
                     return npc
@@ -246,31 +244,28 @@ class latticePlanner:
     def calculate_polynomial(self, a, x_vals):
         return a[0] + a[1] * x_vals + a[2] * x_vals**2 + a[3] * x_vals**3 + a[4] * x_vals**4 + a[5] * x_vals**5
 
-    def latticePlanner(self, ref_path, x, y):
+    def latticePlanner(self, ref_path, vehicle_status):
         out_path = []
-        vehicle_pose_x = x
-        vehicle_pose_y = y
-        vehicle_velocity = self.status_msg.velocity.x * 3.6
+        vehicle_pose_x = vehicle_status.position.x
+        vehicle_pose_y = vehicle_status.position.y
+        vehicle_velocity = vehicle_status.velocity.x * 3.6
 
         look_distance = int(vehicle_velocity * 0.2 * 2)
 
-        if look_distance < 14:
-            look_distance = 14
+        if look_distance < 20:
+            look_distance = 20
 
         # ref_path.poses의 길이를 고려하여 look_distance 조정
         max_look_distance = len(ref_path.poses) // 2 - 1
         look_distance = min(look_distance, max_look_distance)
 
         if len(ref_path.poses) > look_distance:
+            # 지도 데이터
             mapx = [pose.pose.position.x for pose in ref_path.poses]
             mapy = [pose.pose.position.y for pose in ref_path.poses]
-
-            maps = np.zeros(len(mapx))
-            for i in range(len(mapx)):
-                x = mapx[i]
-                y = mapy[i]
-                sd = get_frenet(x, y, mapx, mapy)
-                maps[i] = sd[0]
+            maps = [0]
+            for i in range(1, len(mapx)):
+                maps.append(maps[-1] + get_dist(mapx[i-1], mapy[i-1], mapx[i], mapy[i]))
 
             global_ref_end_point = (ref_path.poses[look_distance * 2].pose.position.x,
                                     ref_path.poses[look_distance * 2].pose.position.y)
@@ -286,14 +281,14 @@ class latticePlanner:
                 for lane_offset in lane_offsets:
                     lattice_path = Path()
                     lattice_path.header.frame_id = 'map'
-                    goal_d_with_offset = vehicle_d + lane_offset
+                    goal_d_with_offset = vehicle_d + lane_offset 
 
                     # forward vehicle's speed based target point -> changed to controlled velocity (전방향 차량 속도에 따라 제어된 속도값 사용 : 현재 차량의 속도값 사용하게 됨)
                     if self.foward_vehicle_speed > 5:
                         goal_s_with_offset = vehicle_s + min(self.target_velocity, self.status_msg.velocity.x) * time_offset
                     else :
                         goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
-
+                    
                     # Test용 코드
                     # goal_s_with_offset = vehicle_s + 50 * time_offset
 

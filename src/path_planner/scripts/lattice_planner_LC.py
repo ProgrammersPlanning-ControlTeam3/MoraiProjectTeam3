@@ -99,6 +99,7 @@ class latticePlanner:
         local_position = rotation_matrix.dot(translation)
         return Point(x=local_position[0], y=local_position[1], z=0)
 
+
     def get_forward_vehicle(self, ref_path, object_data):
 
         forward_vehicle = ref_path.poses[0].pose.position
@@ -113,8 +114,10 @@ class latticePlanner:
                 if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1.75:
                     # print("Vehicle ahead : ", local_npc_position.x - local_pose.x)
                     # print(npc.velocity.x)
-                    return npc
-        return None
+                    return npc.velocity.x
+
+        return 0
+
 
 
     def get_npc_ids_in_range(self, ref_path, object_data, x_min, x_max, y_min, y_max):
@@ -237,6 +240,7 @@ class latticePlanner:
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
 
+
     def object_callback(self, msg):
         self.is_obj = True
         self.object_data = msg
@@ -285,15 +289,12 @@ class latticePlanner:
         look_distance = min(look_distance, max_look_distance)
 
         if len(ref_path.poses) > look_distance:
+            # 지도 데이터
             mapx = [pose.pose.position.x for pose in ref_path.poses]
             mapy = [pose.pose.position.y for pose in ref_path.poses]
-
-            maps = np.zeros(len(mapx))
-            for i in range(len(mapx)):
-                x = mapx[i]
-                y = mapy[i]
-                sd = get_frenet(x, y, mapx, mapy)
-                maps[i] = sd[0]
+            maps = [0]
+            for i in range(1, len(mapx)):
+                maps.append(maps[-1] + get_dist(mapx[i-1], mapy[i-1], mapx[i], mapy[i]))
 
             global_ref_end_point = (ref_path.poses[look_distance * 2].pose.position.x,
                                     ref_path.poses[look_distance * 2].pose.position.y)
