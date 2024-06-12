@@ -31,14 +31,13 @@ class stanley_parking:
         self.forward_point = Point()
         self.current_position = Point()
 
-        self.target_velocity = 40  # Target Velocity in m/s
+        self.target_velocity = 10  # Target Velocity in m/s
 
-        self.k = 0.5  # Stanley Gain
-        self.k_psi = 0.5  # For heading Error
-        self.k_y = 1.0  # For CTR Error
+        self.k = 1.0  # Stanley Gain
+        self.k_psi = 1  # For heading Error
+        self.k_y = 0.8  # For CTR Error
 
-        self.max_cross_track_error = 0.4  # Maximum cross track error
-        self.alpha = 8
+        self.max_cross_track_error = 1.0  # Maximum cross track error
 
         self.vehicle_length = 5.155  # Vehicle Length
 
@@ -151,12 +150,10 @@ class stanley_parking:
         while heading_error < -pi:
             heading_error += 2 * pi
 
-        # alpha
-        alpha = self.alpha / max(self.status_msg.velocity.x, 0.1)
-
         CTR = atan2(self.k * cross_track_error, self.target_velocity)
-        steering = (self.k_psi * heading_error * alpha) + (self.k_y * CTR)
+        steering = (self.k_psi * heading_error) + (self.k_y * CTR)
 
+        print("parking : ", steering)
         return steering
 
 
