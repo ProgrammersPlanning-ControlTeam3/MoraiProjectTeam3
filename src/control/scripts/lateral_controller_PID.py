@@ -34,19 +34,20 @@ class pid_feedforward:
         self.current_postion = Point()
 
         self.vehicle_length = 5.205  # Hyundai Ioniq (hev)
-        self.target_velocity = 40
+        self.target_velocity = 60
 
         self.dt = 0.05
-        self.Kp = 0.001
-        self.Kd = 0.001
+        self.Kp = 0.7
+        self.Kd = 0.01
         self.Ki = 0.001
-        self.kff = 0.001
+        self.kff = 0.0005
         self.error = 0.0
         self.error_prev = self.error
         self.error_d = 0.0
         self.error_i = 0.0
         self.max_delta_error = 3.0
         self.u = 0
+        self.u_prev = self.u
         self.feedforwardterm = 0
         self.coeff = None
 
@@ -57,7 +58,7 @@ class pid_feedforward:
         self.end_time = None
         self.errors = []
 
-        self.lookahead_distance = 20
+        self.lookahead_distance = 50
 
     def global_path_callback(self, msg):
         self.global_path = msg
@@ -134,21 +135,11 @@ class pid_feedforward:
                 closest_idx = i
 
         lookahead_idx = closest_idx
-        # print(len(self.path.poses))
+        if self.selected_lane.data != 4 and self.selected_lane.data != 1:
+            lookahead_idx += self.lookahead_distance
 
-        # if self.is_obstacle_nearby():
-        if self.selected_lane.data != 4 and self.selected_lane.data != 1 :
-
-            for i in range(closest_idx, len(self.path.poses)):
-                global_position = self.path.poses[i].pose.position
-                local_position = self.transform_to_local(global_position, self.current_postion, self.vehicle_yaw)
-                lookahead_dist = sqrt(local_position.x**2 + local_position.y**2)
-                if lookahead_dist >= self.lookahead_distance:
-                    lookahead_idx = i
-                    break
-
-        if lookahead_idx == closest_idx:
-            lookahead_idx = min(lookahead_idx + 1, len(self.path.poses) - 1)
+        if lookahead_idx > len(self.path.poses):
+            lookahead_idx = len(self.path.poses) - 1
 
         lookahead_point = self.path.poses[lookahead_idx].pose.position
         lookahead_local = self.transform_to_local(lookahead_point, self.current_postion, self.vehicle_yaw)
@@ -172,16 +163,16 @@ class pid_feedforward:
         max_cte = 10.0
         cte = np.clip(cte, -max_cte, max_cte)
 
-        if abs(cte) > 0.3:
-            self.Kp = 0.05
+        if self.selected_lane.data != 4 and self.selected_lane.data != 1:
+            self.Kp = 0.03
             self.Kd = 0.001
             self.Ki = 0.00
             self.kff = 0.0001
         else:
-            self.Kp = 0.6
-            self.Kd = 0.02
+            self.Kp = 0.7
+            self.Kd = 0.01
             self.Ki = 0.001
-            self.kff = 0.001
+            self.kff = 0.0005
 
         self.error = cte
 
@@ -191,37 +182,21 @@ class pid_feedforward:
 
         self.u = self.Kp * self.error + self.Kd * self.error_d + self.Ki * self.error_i + self.kff * self.feedforwardterm
 
-        # if abs(cte) > 0.3:
-            # 조향각 제한 설정 (필요 시)
-            # max_steering_rate = pi / 3600
-
-            # if abs(self.u - self.error_prev) > 0.5:
-            #     if self.u > self.error_prev:
-            #         self.u = self.error_prev + max_steering_rate
-            #         print("+")
-            #     else:
-            #         self.u = self.error_prev - max_steering_rate
-            #         print("-")
-            # print(self.u)
         self.error_prev = self.error
 
         max_steering_angle = pi / 18
         self.u = np.clip(self.u, -max_steering_angle, max_steering_angle)
 
+        max_steering_rate = 0.01
+        if abs(self.u - self.u_prev) > 0.1:
+            if self.u > self.u_prev:
+                self.u = self.u_prev + max_steering_rate
+            else:
+                self.u = self.u_prev - max_steering_rate
+
+        self.u_prev = self.u
         return self.u
 
-
-
-    # def is_obstacle_nearby(self):
-    #     if not self.is_obj:
-    #         return False
-
-    #     for obj in self.object_data.npc_list:
-    #         local_position = self.transform_to_local(obj.position, self.current_postion, self.vehicle_yaw)
-    #         distance = sqrt(local_position.x**2 + local_position.y**2)
-    #         if distance < 40 and local_position.x > -15 and abs(local_position.y) < 5 :
-    #             return True
-    #     return False
 
 
     def get_current_waypoint(self, ego_status, global_path):

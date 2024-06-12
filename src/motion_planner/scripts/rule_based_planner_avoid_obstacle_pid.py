@@ -102,11 +102,11 @@ class rule_based_planner:
                 # steering = self.stanley.calc_stanley_control_local()
 
                 if (self.status_msg.position.y < 1300):
-                    steering = self.pid_feedforward.calc_pid_feedforward()
+                    steering = self.stanley.calc_stanley_control()
                     self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
 
                 else:
-                    steering = self.stanley.calc_stanley_control()
+                    steering = self.pid_feedforward.calc_pid_feedforward()
                     self.re_target_velocity = self.follow_vehicle.control_velocity_avoid_vehicles(self.target_velocity)
 
 

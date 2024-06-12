@@ -302,7 +302,7 @@ class latticePlanner:
 
             goal_s, goal_d = get_frenet(global_ref_end_point[0], global_ref_end_point[1], mapx, mapy)
 
-            lane_offsets = [4.5, 0, -4.5]
+            lane_offsets = [3.5, 0, -3.5]
             time_offsets = [0.6, 1.0]
 
             for time_offset in time_offsets:
@@ -313,7 +313,7 @@ class latticePlanner:
 
                     # forward vehicle's speed based target point -> changed to controlled velocity (전방향 차량 속도에 따라 제어된 속도값 사용 : 현재 차량의 속도값 사용하게 됨)
                     if self.foward_vehicle_speed > 15:
-                        goal_s_with_offset = vehicle_s + min(self.target_velocity, self.status_msg.velocity.x * 1.5) * time_offset
+                        goal_s_with_offset = vehicle_s + min(self.target_velocity, self.status_msg.velocity.x * 2.0) * time_offset
                     else :
                         goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
 
