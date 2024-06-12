@@ -157,16 +157,16 @@ class pid_feedforward:
         max_cte = 10.0
         cte = np.clip(cte, -max_cte, max_cte)
 
-        if abs(cte) > 0.2:
-            self.Kp = 0.005
-            self.Kd = 0.005
+        if abs(cte) > 0.3:
+            self.Kp = 0.06
+            self.Kd = 0.02
             self.Ki = 0.001
-            self.kff = 0.001
+            self.kff = 0.000
         else:
-            self.Kp = 0.01
-            self.Kd = 0.01
-            self.Ki = 0.005
-            self.kff = 0.01
+            self.Kp = 0.003
+            self.Kd = 0.0001
+            self.Ki = 0.0001
+            self.kff = 0.0001
 
         self.error = cte
 
@@ -176,19 +176,21 @@ class pid_feedforward:
 
         self.u = self.Kp * self.error + self.Kd * self.error_d + self.Ki * self.error_i + self.kff * self.feedforwardterm
 
-        if abs(cte) > 0.2:
+        # if abs(cte) > 0.3:
             # 조향각 제한 설정 (필요 시)
-            max_steering_rate = pi / 3600
+            # max_steering_rate = pi / 3600
 
-            if abs(self.u - self.error_prev) > 0.5:
-                if self.u > self.error_prev:
-                    self.u = self.error_prev + max_steering_rate
-                else:
-                    self.u = self.error_prev - max_steering_rate
-            print(self.u)
+            # if abs(self.u - self.error_prev) > 0.5:
+            #     if self.u > self.error_prev:
+            #         self.u = self.error_prev + max_steering_rate
+            #         print("+")
+            #     else:
+            #         self.u = self.error_prev - max_steering_rate
+            #         print("-")
+            # print(self.u)
         self.error_prev = self.error
 
-        max_steering_angle = pi / 10
+        max_steering_angle = pi / 18
         self.u = np.clip(self.u, -max_steering_angle, max_steering_angle)
 
         return self.u
