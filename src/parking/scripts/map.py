@@ -60,7 +60,7 @@ def map():
 
         DataX = DataPos['x']
         DataY = DataPos['y']
-        collision_weight = 1.4
+        collision_weight = 1.8
         if DataId == obstacleId['car'] :
             obs = obstacle.RectangleObstacle(DataX,DataY,car_size[0],car_size[1],DataYaw,collision_weight)
             obstacleList.append(obs)

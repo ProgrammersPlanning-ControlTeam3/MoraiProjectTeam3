@@ -11,6 +11,10 @@ class ScenarioLoader():
         ## Morai 경로
         self.path = '/home/nodazi24/Downloads/MoraiLauncher_Lin/MoraiLauncher_Lin_Data/SaveFile/Scenario/R_KR_PG_K-City/test.json'
 
+        #for DCV
+        self.path = '/home/ubuntu/Desktop/MoraiLauncher_Lin/MoraiLauncher_Lin_Data/SaveFile/Scenario/R_KR_PG_K-City/test.json'
+
+        
         #Random 시나리오
         # self.path = 'src/random_scenario_maker/scenario/random_obstacle_scenario_for_test.json'
         #Sample 시나리오
