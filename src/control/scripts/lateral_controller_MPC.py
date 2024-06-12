@@ -11,8 +11,9 @@ from morai_msgs.msg import EgoVehicleStatus
 import matplotlib.pyplot as plt
 import cvxpy as cp
 import time
-from controller_utils import *
-
+import sys
+sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
+from control.scripts.controller_utils import *
 
 class MPCController:
     def __init__(self):

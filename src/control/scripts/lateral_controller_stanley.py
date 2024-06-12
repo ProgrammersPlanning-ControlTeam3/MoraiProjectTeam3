@@ -10,7 +10,9 @@ from nav_msgs.msg import Odometry, Path
 from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
 import matplotlib.pyplot as plt
 import time
-from controller_utils import *
+import sys
+sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
+from control.scripts.controller_utils import *
 
 class stanley:
     def __init__(self):

@@ -10,8 +10,9 @@ from nav_msgs.msg import Odometry, Path
 from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
 import matplotlib.pyplot as plt
 import time
-from controller_utils import *
-
+import sys
+sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
+from control.scripts.controller_utils import *
 
 class pid_feedforward:
     def __init__(self):
@@ -108,6 +109,7 @@ class pid_feedforward:
         local_position = rotation_matrix.dot(translation)
         return Point(x=local_position[0], y=local_position[1], z=0)
 
+
     def compute_cte(self):
         if self.path is None or not self.path.poses:
             return 0.0
@@ -125,6 +127,7 @@ class pid_feedforward:
                 closest_idx = i
 
         lookahead_idx = closest_idx
+        # print(len(self.path.poses))
 
         if self.is_obstacle_nearby():
             for i in range(closest_idx, len(self.path.poses)):
@@ -148,26 +151,30 @@ class pid_feedforward:
 
         return cte
 
+
+
+
     def calc_pid_feedforward(self):
         if not self.is_path or not self.is_odom or not self.is_status:
             return 0.0
 
         cte = self.compute_cte()
+        # print(cte)
         if self.coeff is None:
             return 0.0
         max_cte = 10.0
         cte = np.clip(cte, -max_cte, max_cte)
 
         if abs(cte) > 0.3:
-            self.Kp = 0.06
+            self.Kp = 0.05
+            self.Kd = 0.001
+            self.Ki = 0.00
+            self.kff = 0.0001
+        else:
+            self.Kp = 0.6
             self.Kd = 0.02
             self.Ki = 0.001
-            self.kff = 0.000
-        else:
-            self.Kp = 0.003
-            self.Kd = 0.0001
-            self.Ki = 0.0001
-            self.kff = 0.0001
+            self.kff = 0.001
 
         self.error = cte
 

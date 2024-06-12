@@ -111,12 +111,11 @@ class latticePlanner:
         for local_pose in local_path:
             for npc in object_data.npc_list:
                 local_npc_position = self.transform_to_local(npc.position, forward_vehicle, forward_theta)
-                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1.75:
+                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1:
                     # print("Vehicle ahead : ", local_npc_position.x - local_pose.x)
                     # print(npc.velocity.x)
-                    return npc.velocity.x
-
-        return 0
+                    return npc
+        return None
 
 
 
@@ -207,19 +206,19 @@ class latticePlanner:
         else:
             selected_lane = lane_weight.index(min(lane_weight))
 
-        print("Lane change : ", selected_lane)
-        print("min weight : ", lane_weight[selected_lane])
-        print("0 : ", lane_weight[0])
-        print("1 : ", lane_weight[1])
-        print("2 : ", lane_weight[2])
-        print("3 : ", lane_weight[3])
-        print("4 : ", lane_weight[4])
-        print("5 : ", lane_weight[5])
-        print("\n")
+        # print("Lane change : ", selected_lane)
+        # print("min weight : ", lane_weight[selected_lane])
+        # print("0 : ", lane_weight[0])
+        # print("1 : ", lane_weight[1])
+        # print("2 : ", lane_weight[2])
+        # print("3 : ", lane_weight[3])
+        # print("4 : ", lane_weight[4])
+        # print("5 : ", lane_weight[5])
+        # print("\n")
 
         if lane_weight[selected_lane] >= 1000: # 모든 경로의 웨이트가 높은 경우 직진 -> 감속하기 위해서
             selected_lane = 1
-            print("Lane change : ", selected_lane)
+            # print("Lane change : ", selected_lane)
 
         return selected_lane
 
@@ -303,7 +302,7 @@ class latticePlanner:
 
             goal_s, goal_d = get_frenet(global_ref_end_point[0], global_ref_end_point[1], mapx, mapy)
 
-            lane_offsets = [4, 0, -4]
+            lane_offsets = [4.5, 0, -4.5]
             time_offsets = [0.6, 1.0]
 
             for time_offset in time_offsets:
