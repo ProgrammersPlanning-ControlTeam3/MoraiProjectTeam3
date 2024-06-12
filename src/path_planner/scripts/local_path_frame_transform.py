@@ -19,10 +19,6 @@ class PathPub:
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
 
-        #parking_path Sub
-        rospy.Subscriber("/global_path_parking", Path, self.global_path_parking_callback)
-
-
         self.local_path_pub = rospy.Publisher('/local_path', Path, queue_size=1)
 
         self.global_path_msg = Path()

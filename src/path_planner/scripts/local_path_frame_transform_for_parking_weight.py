@@ -18,6 +18,7 @@ from morai_msgs.msg import EgoVehicleStatus
 from tf.transformations import euler_from_quaternion
 from frame_transform import get_frenet, get_cartesian, get_dist
 from parking.scripts.dubins import Dubins
+from weightedLeastSquare import WeightedLeastSquare
 
 isArrived = False
 
@@ -47,6 +48,8 @@ class PathPub:
         self.global_path_parking_msg = Path()
         self.global_path_parking_msg.header.frame_id = 'map'
 
+        #weighted
+        self.WLS = WeightedLeastSquare()
 
         self.is_status = False
         self.local_path_size = 30
@@ -100,7 +103,7 @@ class PathPub:
         kappa_ = 1./2.0
         cartesian_path, _,_ = dubins.plan([x,y,yaw],local_path_points[-1],kappa_)
         path_x , path_y , path_yaw = cartesian_path
-        
+
         for i in range(len(path_x)) :
             local_path.append([path_x[i],path_y[i]])
 
@@ -111,6 +114,10 @@ class PathPub:
             tmp_pose.pose.orientation.w = 1
             local_path_msg.poses.append(tmp_pose)
 
+        #weighted
+        # self.coeff = self.WLS.fit_curve(local_path_points)
+        # print(self.coeff)
+        
         return local_path_msg
 
     def generate_local_path(self, x, y):

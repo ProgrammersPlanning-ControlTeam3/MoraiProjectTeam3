@@ -267,7 +267,6 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
                 open_list.append(child)
         
         # show graph
-        # TODO: plot issue point
         # if show_animation:
         #     plt.plot(cur_node.position[0], cur_node.position[1], 'yo', alpha=0.5)
         #     if len(closed_list) % 100 == 0:
@@ -304,8 +303,9 @@ def main():
         plt.xlabel("X [m]"), plt.ylabel("Y [m]")
         # plt.title("Hybrid a star algorithm", fontsize=20)
 
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.02)
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
     print("Optimal path found!")
+    print(opt_path)
     len_opt_path = len(opt_path)
 
     #Dubins
@@ -338,19 +338,21 @@ def hybrid_a_star():
     #goal= [x,y ,yaw]
     start, goal, obstacle_list, space = map()
     opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
-    
+    opt_path.append(goal)
+
     out_path = Path()
-    out_path.header.frame_id = '/map'
+    # out_path.header.frame_id = '/map'
 
     #message
-    for waypoint in opt_path :
-        path_x = waypoint[0]
-        path_y = waypoint[1]
-        read_pose = PoseStamped()
-        read_pose.pose.position.x = path_x
-        read_pose.pose.position.y = path_y
-        read_pose.pose.orientation.w = 1
-        out_path.poses.append(read_pose)
+    # for waypoint in opt_path :
+    #     path_x = waypoint[0]
+    #     path_y = waypoint[1]
+    #     path_yaw = waypoint[2]
+    #     read_pose = PoseStamped()
+    #     read_pose.pose.position.x = path_x
+    #     read_pose.pose.position.y = path_y
+    #     read_pose.pose.orientation.w = path_yaw
+    #     out_path.poses.append(read_pose)
 
     #마지막 point 에서 주차goal 까지 dubins로 경로 생성.
     dubins = Dubins()
@@ -358,15 +360,17 @@ def hybrid_a_star():
     cartesian_path, _,_ = dubins.plan(opt_path[-1],goal,kappa_)
     path_x , path_y , path_yaw = cartesian_path
     dubins_path = []
-    for i in range(len(path_x)) :
-        opt_path.append([path_x[i],path_y[i]])
+
+    # for i in range(len(path_x)) :
+    #     opt_path.append([path_x[i],path_y[i]],path_yaw[i])
         # dubins_path.append([path_x[i],path_y[i]])
-    print(dubins_path)
+    # print(dubins_path)
+
     return opt_path, out_path, dubins_path
 
 if __name__ == "__main__":
-    hybrid_a_star()
-    # main()
+    #hybrid_a_star()
+    main()
 
 
 
