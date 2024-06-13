@@ -110,8 +110,8 @@ class PathPub:
             yaw_target = yaw
 
         # # 조정된 d_target 계산
-        # d_adjustment = 0.7  # 중앙에 맞추기 위해 조정할 값
-        # d_target += d_adjustment
+        d_adjustment = 0.3  # 중앙에 맞추기 위해 조정할 값
+        d_target += d_adjustment
 
         # 5차 곡선 생성
         T = 1.0
