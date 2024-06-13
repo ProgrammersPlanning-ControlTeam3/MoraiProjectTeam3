@@ -45,7 +45,8 @@ class FollowVehicle:
                     desired_velocity = min(desired_velocity, forward_speed - 5.0)
                 if forward_dist < 5:
                     desired_velocity = -5.0
-
+            elif forward_dist < 10:
+                desired_velocity = -1.0
         elif self.checkObject_npc_path(self.lattice_path, self.object_path) and self.selected_lane.data == 1:
             desired_velocity = target_velocity - 5.0
 
@@ -84,7 +85,7 @@ class FollowVehicle:
         for local_pose in local_path:
             for npc in object_data.npc_list:
                 local_npc_position = self.transform_to_local(npc.position, forward_vehicle, forward_theta)
-                if 0 < (local_npc_position.x - local_pose.x) < 50 and abs(local_npc_position.y - local_pose.y) < 1.75:
+                if 0 < (local_npc_position.x - local_pose.x) < 30 and abs(local_npc_position.y - local_pose.y) < 1.75:
                     return True, local_npc_position.x - local_pose.x, npc.velocity.x
 
         return False, 0, 0

@@ -315,7 +315,7 @@ class latticePlanner:
 
                     # forward vehicle's speed based target point -> changed to controlled velocity (전방향 차량 속도에 따라 제어된 속도값 사용 : 현재 차량의 속도값 사용하게 됨)
                     if self.foward_vehicle_speed > 15:
-                        goal_s_with_offset = vehicle_s + min(self.target_velocity, self.status_msg.velocity.x * 2.0) * time_offset
+                        goal_s_with_offset = vehicle_s + min(self.target_velocity, self.status_msg.velocity.x * 3.0) * time_offset
                     else :
                         goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
 
