@@ -99,11 +99,14 @@ class rule_based_planner:
                 self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
 
                 steering = self.stanley.calc_stanley_control_local()
+                # steering = self.pid_feedforward.calc_pid_feedforward()
 
                 if self.inHighway : 
-                    steering = self.pid_feedforward.calc_pid_feedforward()
+                    # steering = self.pid_feedforward.calc_pid_feedforward()
+                    steering = self.stanley.calc_stanley_control()
                     self.re_target_velocity = self.follow_vehicle.control_velocity_avoid_vehicles(self.target_velocity)
-                
+                    # self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
+
                 if self.inTollgate : 
                     steering = self.stanley.calc_stanley_control_local()
                     self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)

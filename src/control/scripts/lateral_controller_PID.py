@@ -138,7 +138,7 @@ class pid_feedforward:
         if self.selected_lane.data != 4 and self.selected_lane.data != 1:
             lookahead_idx += self.lookahead_distance
 
-        if lookahead_idx > len(self.path.poses):
+        if lookahead_idx >= len(self.path.poses):
             lookahead_idx = len(self.path.poses) - 1
 
         lookahead_point = self.path.poses[lookahead_idx].pose.position
