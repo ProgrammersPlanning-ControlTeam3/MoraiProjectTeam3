@@ -7,7 +7,7 @@
   <!-- <node pkg="parking" type="path_maker.py" name="parking" /> -->
 
   <!-- CONTROL_Pure Pursuit -->
-  <node pkg="motion_planner" type="rule_based_planner_avoid_obstacle_pid.py" name="rule_based_planner" output="screen"/>
+  <node pkg="motion_planner" type="rule_based_planner_parking_stanley.py" name="rule_based_planner" output="screen"/>
 
   <!-- GPS AND IMU SENSOR -->
   <node pkg="state_estimator" type="gpsimu_parser.py" name="GPS_IMU_parser" />

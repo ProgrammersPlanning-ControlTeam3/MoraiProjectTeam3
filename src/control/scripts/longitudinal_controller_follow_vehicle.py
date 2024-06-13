@@ -59,6 +59,9 @@ class FollowVehicle:
             if forward_dist < self.time_gap * self.status_msg.velocity.x:
                 desired_velocity = min(desired_velocity, forward_speed - 5.0)
 
+        elif self.checkObject_npc_path(self.lattice_path, self.object_path):
+            desired_velocity = target_velocity - 5.0
+
         return desired_velocity
 
 

@@ -23,8 +23,8 @@ from weightedLeastSquare import WeightedLeastSquare
 isArrived = False
 
 """
-1. Edited global path(add yaw) 
-2. 
+1. Edited global path(add yaw)
+2.
 
 """
 class PathPub:
@@ -91,33 +91,39 @@ class PathPub:
     def create_local_path_msg(self):
         local_path_msg = Path()
         local_path_msg.header.frame_id = 'map'
-
         x = self.x
         y = self.y
         yaw = self.yaw
-
         local_path_points = self.generate_local_path(x, y)
         local_path = []
-        
-        dubins = Dubins()
-        kappa_ = 1./2.0
-        cartesian_path, _,_ = dubins.plan([x,y,yaw],local_path_points[-1],kappa_)
-        path_x , path_y , path_yaw = cartesian_path
-
-        for i in range(len(path_x)) :
-            local_path.append([path_x[i],path_y[i]])
-
+        ## dubins
+        # dubins = Dubins()
+        # kappa_ = 1./2.0
+        # cartesian_path, _,_ = dubins.plan([x,y,yaw],local_path_points[-1],kappa_)
+        # path_x , path_y , path_yaw = cartesian_path
+        # for i in range(len(path_x)) :
+        #     local_path.append([path_x[i],path_y[i]])
+        # for point in local_path:
+        #     tmp_pose = PoseStamped()
+        #     tmp_pose.pose.position.x = point[0]
+        #     tmp_pose.pose.position.y = point[1]
+        #     tmp_pose.pose.orientation.w = 1
+        #     local_path_msg.poses.append(tmp_pose)
+        #weighted
+        self.coeff = self.WLS.fit_curve(local_path_points)
+        # print(self.coeff)
+        x_range = [point[0] for point in local_path_points]
+        #print("x range", x_range)
+        y_range = self.evaluate_polynomial(self.coeff, x_range)
+        # print("y_range", y_range)
+        for i in range(len(x_range)):
+            local_path.append([x_range[i], y_range[i]])
         for point in local_path:
             tmp_pose = PoseStamped()
             tmp_pose.pose.position.x = point[0]
             tmp_pose.pose.position.y = point[1]
             tmp_pose.pose.orientation.w = 1
             local_path_msg.poses.append(tmp_pose)
-
-        #weighted
-        # self.coeff = self.WLS.fit_curve(local_path_points)
-        # print(self.coeff)
-        
         return local_path_msg
 
     def generate_local_path(self, x, y):
@@ -136,12 +142,19 @@ class PathPub:
             if min_dist > dist :
                 min_dist = dist
                 cnt = i
-        for i in range(cnt, cnt+8) :
+        for i in range(cnt, cnt+10) :
             try:
                 local_path_points.append([mapx[i],mapy[i],map_yaw[i]])
             except IndexError :
                 pass
         return local_path_points
+
+    def evaluate_polynomial(self, coefficients, x):
+        """ 주어진 9차 다항식의 계수와 x값을 이용하여 y값 계산 """
+        return np.polyval(list((coefficients)), x)
+        
+
+
 
 
 if __name__ == '__main__':

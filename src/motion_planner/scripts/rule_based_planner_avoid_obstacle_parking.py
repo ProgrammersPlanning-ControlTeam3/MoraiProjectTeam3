@@ -27,9 +27,9 @@ sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 from control.scripts.pid_controller import pidControl
 from control.scripts.lateral_controller import stanley
 # from control.scripts.lateral_controller import pure_pursuit
-from control.scripts.longitudinal_controller import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
-from control.scripts.longitudinal_follow_vehicle import FollowVehicle
+from control.scripts.longitudinal_controller_curvebased import velocityPlanning
+from control.scripts.longitudinal_controller_follow_vehicle import FollowVehicle
 
 arrivedParkingLot = False
 class rule_based_planner:
@@ -102,9 +102,12 @@ class rule_based_planner:
                 # steering = self.stanley.calc_stanley_control_local()
 
                 if (self.status_msg.position.y < 1300):
-                    steering = self.stanley.calc_stanley_control_local()
-                else:
                     steering = self.stanley.calc_stanley_control()
+                    self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
+
+                else:
+                    steering = self.pid_feedforward.calc_pid_feedforward()
+                    self.re_target_velocity = self.follow_vehicle.control_velocity_avoid_vehicles(self.target_velocity)
 
                 self.ctrl_cmd_msg.steering = steering #0.0 last
                 print(steering)

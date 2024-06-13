@@ -18,7 +18,7 @@ import sys
 current_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_path)
 
-from lib.mgeo.class_defs import *
+# from lib.mgeo.class_defs import *
 sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 sys.path.insert(0, '/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src')
 #print(sys.path)
@@ -26,9 +26,11 @@ sys.path.insert(0, '/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src')
 from control.scripts.pid_controller import pidControl
 from control.scripts.stanley_parking import stanley_parking
 from control.scripts.lateral_controller import stanley
-from control.scripts.longitudinal_controller import velocityPlanning
+from control.scripts.lateral_controller_PID import pid_feedforward
+from control.scripts.longitudinal_controller_curvebased import velocityPlanning
+from control.scripts.longitudinal_controller_follow_vehicle import FollowVehicle
 from object_detector.scripts.object_detector import object_detector
-from control.scripts.longitudinal_follow_vehicle import FollowVehicle
+
 
 arrivedParkingLot = False
 class rule_based_planner:
@@ -43,7 +45,7 @@ class rule_based_planner:
         # GET OBJECT TOPIC
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber('/Ego_topic', EgoVehicleStatus, self.status_callback)
-        # rospy.Subscriber("/Object_topic", data_class=ObjectStatusList, self.object_callback)
+
         # PUBLISHING CONTROL TOPIC, Name ctrl_cmd_pub Get CtrlCmd Topic
         self.ctrl_cmd_pub = rospy.Publisher('ctrl_cmd_0', CtrlCmd, queue_size=1)
         # 객체 정보 수신
@@ -65,16 +67,18 @@ class rule_based_planner:
         self.target_velocity = 40 # morive max_speed": 60, default : 40
 
         self.inParkingLot = False
+        self.inTollgate = False
+        self.inHighway = False
+
         # 제어 시스템 및 알고리즘 초기화 부분
         self.pid = pidControl() # PID Control
         self.vel_planning = velocityPlanning(self.target_velocity / 3.6, 0.15) # Velocity Control
         self.stanley = stanley() 
         self.stanley_parking = stanley_parking()
-        self.follow_vehicle = FollowVehicle()
-        # self.pure_pursuit = pure_pursuit() # Pure Pursuit control
-        # self.object_detector = object_detector() # Object Detection to avoid
+        self.pid_feedforward = pid_feedforward()
 
-        # 무한 루프: self.is_global_path가 True로 설정될때까지 계속 실행.
+        self.follow_vehicle = FollowVehicle()
+
         while True:
             if self.is_global_path == True: # If you get the Global Path Information
                 self.velocity_list = self.vel_planning.curvedBaseVelocity(self.global_path, 50) # Set velocity ,,
@@ -90,30 +94,26 @@ class rule_based_planner:
                 prev_time = time.time()
 
                 self.current_waypoint = self.stanley.get_current_waypoint(self.status_msg, self.global_path)
-                # self.current_waypoint = self.pure_pursuit.get_current_waypoint(self.status_msg, self.global_path)
 
                 self.target_velocity = self.velocity_list[self.current_waypoint] * 3.6
-
-                ## TODO target_velocity -> 감속 (앞 차량이 있거나, 예측 경로와 겹칠 경우)
-                self.re_target_velocity = self.follow_vehicle.control_velocity(self.target_velocity)
-
-
-                # steering = self.stanley.calc_stanley_control()
-                # steering = self.pure_pursuit.calc_pure_pursuit()
-                # TODO tollgate area : No lattice path. Follow local path. Need to make follow local path method in stanley class
-                # steering = self.stanley.calc_stanley_control_local()
+                self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
 
                 steering = self.stanley.calc_stanley_control_local()
 
-                self.ctrl_cmd_msg.steering = steering #0.0 last
+                if self.inHighway : 
+                    steering = self.pid_feedforward.calc_pid_feedforward()
+                    self.re_target_velocity = self.follow_vehicle.control_velocity_avoid_vehicles(self.target_velocity)
+                
+                if self.inTollgate : 
+                    steering = self.stanley.calc_stanley_control_local()
+                    self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
 
                 if self.inParkingLot :
-                    self.current_waypoint = self.stanley_parking.get_current_waypoint(self.status_msg, self.global_path)
                     steering = self.stanley_parking.calc_stanley_control_local()
                     # print("In ParkingLot")
                     self.re_target_velocity = 10
                 
-
+                self.ctrl_cmd_msg.steering = steering #0.0 last
                 output = self.pid.pid(self.re_target_velocity, self.status_msg.velocity.x * 3.6)
 
                 if output > 0.0:
@@ -127,6 +127,7 @@ class rule_based_planner:
                 self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
 
             rate.sleep()
+
 
 
     def call_service(self, gear_value):
@@ -171,11 +172,36 @@ class rule_based_planner:
         _,_,self.vehicle_yaw=euler_from_quaternion(odom_quaternion)
         self.current_position.x=msg.pose.pose.position.x
         self.current_position.y=msg.pose.pose.position.y
-        # print(self.inParkingLot)
+
+        if self.arrivedAtPoint(196.4,1773.9) : 
+            self.inHighway = True
+            # print("in hw")
+        if self.arrivedAtPoint(209.9,1290.3) : 
+            self.inHighway = False
+            self.inTollgate = True
+            # print("in tg")
         if self.arrivedAtPoint(7.23,1066.8476) :
-            # print("Hi ParkingLot")
+            self.inTollgate = False
             self.inParkingLot = True
-            
+            # print("in pl")
+        
+
+# "parkingLotGoal": {
+#     "pos": {
+#       "x": 5.25,
+#       "y": 1021.73,
+#       "z": -0.5720000267028809,
+#       "_x": "5.25",
+#       "_y": "1021.73",
+#       "_z": "-0.572"
+#     },
+#     "rot": {
+#       "roll": "0.0",
+#       "pitch": "0.0",
+#       "yaw": "-120.769"
+#     }
+#   }
+# }
 
     def path_callback(self,msg):
         self.is_path=True

@@ -29,14 +29,16 @@ Width : 1.495m
 Wheelbase : 3.16 m
 """
 class Node:
-    def __init__(self, parent=None, position=None):
+    def __init__(self, parent=None, position=None, direction = 2):
         self.parent = parent
         self.position = position
         self.heading = 3.14
         #g = f + h
+        self.direction = direction
         self.f = 0
         self.g = 0
         self.h = 0
+
 def slice_list_with_interval(lst, interval):
     # 첫 번째 원소는 항상 포함
     result = [lst[0]]
@@ -198,7 +200,7 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
         # print("cur node = ", cur_index, cur_node.position, cur_node.f)
 
         # If goal, return optimal path
-        if (isSamePosition(cur_node, goal_node, epsilon_position=12)):
+        if (isSamePosition(cur_node, goal_node, epsilon_position=8)):
             opt_path = []
             node = cur_node
             while node is not None :
@@ -215,9 +217,11 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
 
         # action_set = [yaw_rate, delta_time, distance]
         #print("Let's get actions")
-        for action in action_set:
+        for direction, action in enumerate(action_set):
             # R = action[2]
             yaw = action[0]
+            # 0 right, 1 left , 2 straight
+            direction = direction
             # deltaX = R * np.cos(yaw)
             # deltaY = R * np.sin(yaw)
 
@@ -237,7 +241,7 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
 
             # If not collision, create child node
             child = Node(cur_node, child_candidate_position)
-
+            child.direction = direction
             # If already in closed list, do nothing
             isInClosedList = False
             for CompareNode in closed_list :
@@ -253,7 +257,14 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
             # If not in closed list, update open list
             child.g = cur_node.g + action[2]
             child.h = heuristic(child,goal_node)
-            child.f = child.g + weight * child.h
+
+            direction_weight = 0
+            if cur_node.direction == child.direction :
+                # print("same direction")
+                direction_weight = -10
+
+            child.f = child.g + weight * child.h +direction_weight
+            # print(child.f)
             if len(open_list) !=0 :
                 #find same node in open_list
                 for CompareNode in open_list :
@@ -265,23 +276,8 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
                     open_list.append(child)
             else:
                 open_list.append(child)
-        
-        # show graph
-        # if show_animation:
-        #     plt.plot(cur_node.position[0], cur_node.position[1], 'yo', alpha=0.5)
-        #     if len(closed_list) % 100 == 0:
-        #         plt.pause(0.001)
-        
-        #time.sleep(0.1)
-        # cnt +=1
-        # if cnt == 10:
-        #     break
-    print("vehicle can't reach to goal")
 
-def get_opt_path() :
-    start, goal, obstacle_list, space = map()
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.05)
-    return opt_path
+    print("vehicle can't reach to goal")
 
 ## main = plt simulation
 def main():
@@ -303,7 +299,7 @@ def main():
         plt.xlabel("X [m]"), plt.ylabel("Y [m]")
         # plt.title("Hybrid a star algorithm", fontsize=20)
 
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
+    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.05)
     print("Optimal path found!")
     # print(opt_path)
     len_opt_path = len(opt_path)
@@ -338,31 +334,20 @@ def hybrid_a_star():
     #goal= [x,y ,yaw]
     start, goal, obstacle_list, space = map()
     opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
-    # opt_path.append(goal)
+    opt_path.append(goal)
 
     out_path = Path()
-    # out_path.header.frame_id = '/map'
-
-    #message
-    # for waypoint in opt_path :
-    #     path_x = waypoint[0]
-    #     path_y = waypoint[1]
-    #     path_yaw = waypoint[2]
-    #     read_pose = PoseStamped()
-    #     read_pose.pose.position.x = path_x
-    #     read_pose.pose.position.y = path_y
-    #     read_pose.pose.orientation.w = path_yaw
-    #     out_path.poses.append(read_pose)
 
     #마지막 point 에서 주차goal 까지 dubins로 경로 생성.
     dubins = Dubins()
     kappa_ = .5/2.0
     cartesian_path, _,_ = dubins.plan(opt_path[-1],goal,kappa_)
     path_x , path_y , path_yaw = cartesian_path
+
     dubins_path = []
-    
+
     for i in range(len(path_x)) :
-        # opt_path.append([path_x[i],path_y[i],path_yaw[i]])
+        opt_path.append([path_x[i],path_y[i]],path_yaw[i])
         dubins_path.append([path_x[i],path_y[i]])
     print(dubins_path)
 

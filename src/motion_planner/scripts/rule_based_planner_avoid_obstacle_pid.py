@@ -26,8 +26,9 @@ from control.scripts.pid_controller import pidControl
 from control.scripts.lateral_controller_stanley import stanley
 from control.scripts.lateral_controller_PID import pid_feedforward
 from control.scripts.longitudinal_controller_curvebased import velocityPlanning
-from object_detector.scripts.object_detector import object_detector
 from control.scripts.longitudinal_controller_follow_vehicle import FollowVehicle
+from object_detector.scripts.object_detector import object_detector
+
 # from path_planner.scripts.lattice_planner_LC import latticePlanner
 
 class rule_based_planner:

@@ -17,7 +17,7 @@ class stanley_parking:
     def __init__(self):
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
         rospy.Subscriber("/lattice_path", Path, self.path_callback)
-        rospy.Subscriber("/local_path", Path, self.local_path_callback)
+        rospy.Subscriber("/local_path_parking", Path, self.local_path_callback)
 
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)

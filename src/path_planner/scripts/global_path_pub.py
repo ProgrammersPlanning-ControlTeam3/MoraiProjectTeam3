@@ -71,7 +71,7 @@ class dijkstra_path_pub :
         #global_path 경로
         parking_waypoint, _, dubins_waypoint = hybrid_a_star.hybrid_a_star()
 
-        
+        # parking_waypoint.pop()
         # print(len(parking_waypoint))
 
         for waypoint in parking_waypoint :
@@ -83,6 +83,17 @@ class dijkstra_path_pub :
             read_pose.pose.position.x = path_x
             read_pose.pose.position.y = path_y
             read_pose.pose.orientation.w = path_yaw
+            self.global_path_msg.poses.append(read_pose)
+        # print(dubins_waypoint)
+
+        for waypoint in dubins_waypoint :
+            # print(waypoint)
+            path_x = waypoint[0]
+            path_y = waypoint[1]
+            read_pose = PoseStamped()
+            read_pose.pose.position.x = path_x
+            read_pose.pose.position.y = path_y
+            read_pose.pose.orientation.w = 1
             self.global_path_msg.poses.append(read_pose)
         
         # self.global_path_msg += self.global_path_parking_msg
