@@ -98,26 +98,37 @@ class PathPub:
 
         local_path_points = self.generate_local_path(x, y)
         local_path = []
-        
-        dubins = Dubins()
-        kappa_ = 1./2.0
-        cartesian_path, _,_ = dubins.plan([x,y,yaw],local_path_points[-1],kappa_)
-        path_x , path_y , path_yaw = cartesian_path
+        ## dubins
+        # dubins = Dubins()
+        # kappa_ = 1./2.0
+        # cartesian_path, _,_ = dubins.plan([x,y,yaw],local_path_points[-1],kappa_)
+        # path_x , path_y , path_yaw = cartesian_path
 
-        for i in range(len(path_x)) :
-            local_path.append([path_x[i],path_y[i]])
+        # for i in range(len(path_x)) :
+        #     local_path.append([path_x[i],path_y[i]])
+
+        # for point in local_path:
+        #     tmp_pose = PoseStamped()
+        #     tmp_pose.pose.position.x = point[0]
+        #     tmp_pose.pose.position.y = point[1]
+        #     tmp_pose.pose.orientation.w = 1
+        #     local_path_msg.poses.append(tmp_pose)
+
+        #weighted
+        self.coeff = self.WLS.fit_curve(local_path_points)
+        print(self.coeff)
+        x_range = [point[0] for point in local_path_points]
+        print("x range", x_range)
+        y_range = self.evaluate_polynomial(self.coeff, x_range)
+        for i in range(len(x_range)):
+            local_path.append([x_range[i], y_range[i]])
 
         for point in local_path:
             tmp_pose = PoseStamped()
             tmp_pose.pose.position.x = point[0]
-            tmp_pose.pose.position.y = point[1]
             tmp_pose.pose.orientation.w = 1
             local_path_msg.poses.append(tmp_pose)
 
-        #weighted
-        # self.coeff = self.WLS.fit_curve(local_path_points)
-        # print(self.coeff)
-        
         return local_path_msg
 
     def generate_local_path(self, x, y):
@@ -142,6 +153,10 @@ class PathPub:
             except IndexError :
                 pass
         return local_path_points
+
+    def evaluate_polynomial(self, coefficients, x):
+        """ 주어진 9차 다항식의 계수와 x값을 이용하여 y값 계산 """
+        return sum(c * x ** i for i, c in enumerate(reversed(coefficients)))
 
 
 if __name__ == '__main__':
