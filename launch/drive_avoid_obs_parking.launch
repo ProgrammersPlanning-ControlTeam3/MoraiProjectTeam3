@@ -3,7 +3,7 @@
   <node pkg="path_planner" type="global_path_pub.py" name="global_path_pub" />
   <!-- <node pkg="path_planner" type="local_path_frame_transform.py" name="local_path_pub" /> -->
   
-  <node pkg="path_planner" type="local_path_frame_transform_for_parking_weight.py" name="parking)_local_path_pub" output="screen" />
+  <node pkg="path_planner" type="local_path_frame_transform_for_parking_weight.py" name="parking_local_path_pub" output="screen" />
   <node pkg="path_planner" type="local_path_frame_transform.py" name="local_path_pub" />
 
   <node pkg="path_planner" type="lattice_planner_LC.py" name="lattice_path_pub" output="screen"/>
@@ -26,8 +26,10 @@
   <node pkg="map_loader" type="mgeo_pub.py" name="mgeo_pub" />
 
   <!--Prediction-->
+  <node pkg="prediction" type="bayseian.py" name="bayseian"/>
   <node pkg="prediction" type="vehicle_tracker.py" name="vehicle_tracker" />
-  <node pkg="prediction" type="visualization.py" name="prediction_visualization" />
+  <!-- <node pkg="prediction" type="visualization.py" name="prediction_visualization" /> -->
+  <node pkg="prediction" type="hmm_prediction_path.py" name="hmm_prediction_path" />
 
   <!-- RVIZ -->
   <node pkg = "rviz_runner" type="tf_pub.py" name="tf" />
