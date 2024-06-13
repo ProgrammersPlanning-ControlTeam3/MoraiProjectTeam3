@@ -21,6 +21,7 @@ class FollowVehicle:
         rospy.Subscriber('/Object_topic/tracked_object_path_topic', PredictedObjectPathList, self.object_path_callback)
         rospy.Subscriber('/Object_topic/deleted_object_id', Int32, self.deleted_object_callback)
         rospy.Subscriber("/lattice_path", Path, self.lattice_path_callback)
+        rospy.Subscriber("/selected_lane", Int32, self.selected_lane_callback)
 
         self.is_status = False
         self.is_obj = False
@@ -30,19 +31,33 @@ class FollowVehicle:
         self.object_path = None
         self.deleted_ids = set()
         self.is_lattice_path = False
+        self.is_selected_lane = False
 
-        self.time_gap = 1.5
+        self.time_gap = 2.5
 
-    def control_velocity(self, target_velocity):
 
+    def control_velocity_avoid_vehicles(self, target_velocity):
         desired_velocity = target_velocity
+        is_forward, forward_dist, forward_speed = self.forward_vehicle(self.lattice_path, self.object_data)
+        if is_forward:
+            if self.selected_lane.data == 1:
+                if forward_dist < self.time_gap * self.status_msg.velocity.x:
+                    desired_velocity = min(desired_velocity, forward_speed - 5.0)
+                if forward_dist < 5:
+                    desired_velocity = -5.0
 
+        elif self.checkObject_npc_path(self.lattice_path, self.object_path) and self.selected_lane.data == 1:
+            desired_velocity = target_velocity - 5.0
+
+        return desired_velocity
+
+
+    def control_velocity_follow_vehicles(self, target_velocity):
+        desired_velocity = target_velocity
         is_forward, forward_dist, forward_speed = self.forward_vehicle(self.lattice_path, self.object_data)
         if is_forward:
             if forward_dist < self.time_gap * self.status_msg.velocity.x:
-                desired_velocity = min(desired_velocity, forward_speed - 2.0)
-        elif self.checkObject_npc_path(self.lattice_path, self.object_path):
-            desired_velocity = target_velocity - 5.0
+                desired_velocity = min(desired_velocity, forward_speed - 5.0)
 
         return desired_velocity
 
@@ -69,7 +84,7 @@ class FollowVehicle:
                 if 0 < (local_npc_position.x - local_pose.x) < 50 and abs(local_npc_position.y - local_pose.y) < 1.75:
                     return True, local_npc_position.x - local_pose.x, npc.velocity.x
 
-        return False, 0 , 0
+        return False, 0, 0
     
     def checkObject_npc_path(self, ref_path, object_path):
         
@@ -118,3 +133,6 @@ class FollowVehicle:
         self.is_lattice_path = True
         self.lattice_path = msg
 
+    def selected_lane_callback(self, msg):
+        self.is_selected_lane = True
+        self.selected_lane = msg

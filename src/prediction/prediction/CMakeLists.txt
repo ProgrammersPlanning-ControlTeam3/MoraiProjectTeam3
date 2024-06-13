@@ -20,11 +20,19 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_message_files(
   FILES
+  ManeuverProbability.msg
+  ObjectFrenetPosition.msg
+  PredictedHMM.msg
+  PredictedHMMPath.msg
+  TrackedPointHMM.msg
   TrackedPoint.msg
   PredictedObjectPath.msg
   PredictedObjectPathList.msg
   TrackedObjectPose.msg
   TrackedObjectPoseList.msg
+  PredictedHMM.msg
+  ObjectFrenetPosition.msg
+  ManeuverProbability.msg
 )
 generate_messages(
   DEPENDENCIES

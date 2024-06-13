@@ -25,8 +25,8 @@ sys.path.insert(0, '/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src')
 #print(sys.path)
 
 from control.scripts.pid_controller import pidControl
-from control.scripts.lateral_controller import pure_pursuit_no_npc
-from control.scripts.longitudinal_follow_vehicle import VelocityPlanningFollowVehicle
+from control.scripts.lateral_controller_pure_pursuit import pure_pursuit
+from control.scripts.longitudinal_controller_follow_vehicle import FollowVehicle
 from object_detector.scripts.object_detector import object_detector
 
 class rule_based_planner:

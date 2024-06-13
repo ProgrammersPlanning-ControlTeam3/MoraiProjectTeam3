@@ -18,19 +18,18 @@ import sys
 current_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(current_path)
 
-from lib.mgeo.class_defs import *
-
+# from lib.mgeo.class_defs import *
 sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
 # sys.path.insert(0, '/home/nodazi24/morai_final_second_ws/MoraiProjectTeam3/src')
 #print(sys.path)
 
 from control.scripts.pid_controller import pidControl
-from control.scripts.lateral_controller import stanley
-
+from control.scripts.lateral_controller_stanley import stanley
 # from control.scripts.lateral_controller import pure_pursuit
-from control.scripts.longitudinal_controller import velocityPlanning
+from control.scripts.longitudinal_controller_curvebased import velocityPlanning
 from object_detector.scripts.object_detector import object_detector
-from control.scripts.longitudinal_follow_vehicle import FollowVehicle
+from control.scripts.longitudinal_controller_follow_vehicle import FollowVehicle
+# from path_planner.scripts.lattice_planner_LC import latticePlanner
 
 arrivedParkingLot = False
 class rule_based_planner:
@@ -71,6 +70,7 @@ class rule_based_planner:
         self.vel_planning = velocityPlanning(self.target_velocity / 3.6, 0.15) # Velocity Control
         self.stanley = stanley() 
         self.follow_vehicle = FollowVehicle()
+        # self.selected_path = latticePlanner()
         # self.pure_pursuit = pure_pursuit() # Pure Pursuit control
         # self.object_detector = object_detector() # Object Detection to avoid
 
@@ -91,11 +91,11 @@ class rule_based_planner:
 
                 self.current_waypoint = self.stanley.get_current_waypoint(self.status_msg, self.global_path)
                 # self.current_waypoint = self.pure_pursuit.get_current_waypoint(self.status_msg, self.global_path)
-
+                # print(self.selected_path.get_selected_path())
                 self.target_velocity = self.velocity_list[self.current_waypoint] * 3.6
 
                 ## TODO target_velocity -> 감속 (앞 차량이 있거나, 예측 경로와 겹칠 경우)
-                self.re_target_velocity = self.follow_vehicle.control_velocity(self.target_velocity)
+                # self.re_target_velocity = self.follow_vehicle.control_velocity(self.target_velocity)
 
                 # steering = self.stanley.calc_stanley_control()
                 # steering = self.pure_pursuit.calc_pure_pursuit()
@@ -104,12 +104,17 @@ class rule_based_planner:
 
                 if (self.status_msg.position.y < 1300):
                     steering = self.stanley.calc_stanley_control_local()
+                    self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
+
                 else:
                     steering = self.stanley.calc_stanley_control()
+                    self.re_target_velocity = self.follow_vehicle.control_velocity_avoid_vehicles(self.target_velocity)
+
 
                 self.ctrl_cmd_msg.steering = steering #0.0 last
 
                 output = self.pid.pid(self.re_target_velocity, self.status_msg.velocity.x * 3.6)
+                # output = self.pid.pid(self.target_velocity, self.status_msg.velocity.x * 3.6)
 
                 if output > 0.0:
                     self.ctrl_cmd_msg.accel = output
