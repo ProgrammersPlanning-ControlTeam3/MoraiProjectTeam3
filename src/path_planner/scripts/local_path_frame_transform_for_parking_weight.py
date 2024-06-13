@@ -121,7 +121,6 @@ class PathPub:
         for point in local_path:
             tmp_pose = PoseStamped()
             tmp_pose.pose.position.x = point[0]
-            tmp_pose.pose.position.y = point[1]
             tmp_pose.pose.orientation.w = 1
             local_path_msg.poses.append(tmp_pose)
         return local_path_msg
