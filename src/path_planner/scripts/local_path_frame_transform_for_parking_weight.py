@@ -20,7 +20,7 @@ from frame_transform import get_frenet, get_cartesian, get_dist
 from parking.scripts.dubins import Dubins
 from weightedLeastSquare import WeightedLeastSquare
 
-isArrived = False
+
 
 """
 1. Edited global path(add yaw)
@@ -57,12 +57,14 @@ class PathPub:
         self.x = 0
         self.y = 0
         self.yaw = 0
-
+        self.parkingLot = False
+        self.isArrived = False
         rate = rospy.Rate(10)  # 10hz
         while not rospy.is_shutdown():
             if self.is_status and self.global_path_msg.poses:
-                local_path_msg = self.create_local_path_msg()
-                self.local_path_pub.publish(local_path_msg)
+                if self.isArrived:
+                    local_path_msg = self.create_local_path_msg()
+                    self.local_path_pub.publish(local_path_msg)
             rate.sleep()
 
     def ego_callback(self,msg) :
@@ -75,7 +77,8 @@ class PathPub:
 
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
-
+        if self.arrivedAtPoint(7.23,1066.8476) :
+            self.isArrived = True
     # def status_callback(self, msg):
     #     self.is_status = True
     #     self.x = msg.position.x
@@ -152,6 +155,17 @@ class PathPub:
         """ 주어진 9차 다항식의 계수와 x값을 이용하여 y값 계산 """
         return np.polyval(list((coefficients)), x)
         
+
+    def get_dist(self, x1, y1, x2, y2):
+        distance = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+        return distance
+
+    def arrivedAtPoint (self,x, y, gap = 5.0) :
+        x1, y1 = self.x , self.y
+        if self.get_dist(x1,y1,x,y) < gap :
+            return True
+        else:
+            return False
 
 
 
