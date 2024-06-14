@@ -69,10 +69,13 @@ class rule_based_planner:
         self.inParkingLot = False
         self.inTollgate = False
         self.inHighway = False
+        
+        self.goal = False
 
         # 제어 시스템 및 알고리즘 초기화 부분
         self.pid = pidControl() # PID Control
         self.vel_planning = velocityPlanning(self.target_velocity / 3.6, 0.15) # Velocity Control
+
         self.stanley = stanley() 
         self.stanley_parking = stanley_parking()
         self.pid_feedforward = pid_feedforward()
@@ -114,7 +117,7 @@ class rule_based_planner:
                 if self.inParkingLot :
                     steering = self.stanley_parking.calc_stanley_control_local()
                     # print("In ParkingLot")
-                    self.re_target_velocity = 10
+                    self.re_target_velocity = 8
                 
                 self.ctrl_cmd_msg.steering = steering #0.0 last
                 output = self.pid.pid(self.re_target_velocity, self.status_msg.velocity.x * 3.6)
@@ -126,6 +129,10 @@ class rule_based_planner:
                     self.ctrl_cmd_msg.accel = 0.0
                     self.ctrl_cmd_msg.brake = -output
 
+                if self.goal :
+                    self.ctrl_cmd_msg.accel = 0
+                    self.ctrl_cmd_msg.brake = 1.0
+                    self.ctrl_cmd_msg.steering = 0.0
 
                 self.ctrl_cmd_pub.publish(self.ctrl_cmd_msg)
 
@@ -179,15 +186,23 @@ class rule_based_planner:
         if self.arrivedAtPoint(196.4,1773.9) : 
             self.inHighway = True
             # print("in hw")
+
         if self.arrivedAtPoint(209.9,1290.3) : 
             self.inHighway = False
             self.inTollgate = True
             # print("in tg")
+
+        # Parking Lot
         if self.arrivedAtPoint(7.23,1066.8476) :
             self.inTollgate = False
             self.inParkingLot = True
             # print("in pl")
         
+        # goal
+        if self.arrivedAtPoint(5.25,1021.73, 1) :
+            self.goal = True
+            # print("in pl")
+
 
 # "parkingLotGoal": {
 #     "pos": {

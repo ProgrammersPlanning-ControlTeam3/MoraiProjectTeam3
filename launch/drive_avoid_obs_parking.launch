@@ -3,9 +3,13 @@
   <node pkg="path_planner" type="global_path_pub.py" name="global_path_pub" />
   <!-- <node pkg="path_planner" type="local_path_frame_transform.py" name="local_path_pub" /> -->
   
+  <!-- local path for parkingLot  -->
   <node pkg="path_planner" type="local_path_frame_transform_for_parking_weight.py" name="parking_local_path_pub" output="screen" />
+  
+  <!-- local path for highway  -->
   <node pkg="path_planner" type="local_path_frame_transform.py" name="local_path_pub" />
 
+  <!-- Lattice Path -->
   <node pkg="path_planner" type="lattice_planner_LC.py" name="lattice_path_pub" output="screen"/>
 
   <!-- Parking Path -->
