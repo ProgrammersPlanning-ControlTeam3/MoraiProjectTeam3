@@ -30,10 +30,10 @@
   <node pkg="map_loader" type="mgeo_pub.py" name="mgeo_pub" />
 
   <!--Prediction-->
-  <node pkg="prediction" type="bayseian.py" name="bayseian"/>
-  <node pkg="prediction" type="vehicle_tracker.py" name="vehicle_tracker" />
+  <!-- <node pkg="prediction" type="bayseian.py" name="bayseian"/> -->
+  <!-- <node pkg="prediction" type="vehicle_tracker.py" name="vehicle_tracker" /> -->f
   <!-- <node pkg="prediction" type="visualization.py" name="prediction_visualization" /> -->
-  <node pkg="prediction" type="hmm_prediction_path.py" name="hmm_prediction_path" />
+  <!-- <node pkg="prediction" type="hmm_prediction_path.py" name="hmm_prediction_path" /> -->
 
   <!-- RVIZ -->
   <node pkg = "rviz_runner" type="tf_pub.py" name="tf" />
