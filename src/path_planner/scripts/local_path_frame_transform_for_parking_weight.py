@@ -96,6 +96,7 @@ class PathPub:
         yaw = self.yaw
         local_path_points = self.generate_local_path(x, y)
         local_path = []
+
         ## dubins
         # dubins = Dubins()
         # kappa_ = 1./2.0
@@ -109,6 +110,7 @@ class PathPub:
         #     tmp_pose.pose.position.y = point[1]
         #     tmp_pose.pose.orientation.w = 1
         #     local_path_msg.poses.append(tmp_pose)
+
         #weighted
         self.coeff = self.WLS.fit_curve(local_path_points)
         # print(self.coeff)
@@ -118,9 +120,11 @@ class PathPub:
         # print("y_range", y_range)
         for i in range(len(x_range)):
             local_path.append([x_range[i], y_range[i]])
+            
         for point in local_path:
             tmp_pose = PoseStamped()
             tmp_pose.pose.position.x = point[0]
+            tmp_pose.pose.position.y = point[1]
             tmp_pose.pose.orientation.w = 1
             local_path_msg.poses.append(tmp_pose)
         return local_path_msg

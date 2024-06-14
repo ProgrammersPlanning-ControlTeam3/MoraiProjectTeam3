@@ -115,9 +115,10 @@ class PathPub:
 
         # 5차 곡선 생성
         T = 1.0
-        s_coeff = self.generate_5th_order_polynomial(s, s_target, 0, T)
-        d_coeff = self.generate_5th_order_polynomial(d, d_target, 0, T)
-        yaw_coeff = self.generate_5th_order_polynomial(yaw, yaw_target, 0, T)
+        s_coeff = self.generate_5th_order_polynomial(s, 0, 0, s_target, 0, 0, T)
+        d_coeff = self.generate_5th_order_polynomial(d, 0, 0, d_target, 0, 0, T)
+        yaw_coeff = self.generate_5th_order_polynomial(yaw, 0, 0, yaw_target, 0, 0, T)
+
 
         for i in range(self.local_path_size):
             t = i * (T / self.local_path_size)
@@ -144,17 +145,37 @@ class PathPub:
         map_yaw.append(map_yaw[-1])
         return map_yaw
 
-    def generate_5th_order_polynomial(self, ys, yf, xs, xf):
-        # 5차 곡선 계수 계산
-        if xf == 0:
-            return [ys, 0, 0, 0, 0, 0]  # xf가 0일 경우를 처리
-        a0 = ys
-        a1 = 0
-        a2 = 0
-        a3 = (10 * (yf - ys)) / (xf ** 3)
-        a4 = (-15 * (yf - ys)) / (xf ** 4)
-        a5 = (6 * (yf - ys)) / (xf ** 5)
+
+    def generate_5th_order_polynomial(self, xi, vi, ai, xf, vf, af, T):
+        a0 = xi
+        a1 = vi
+        a2 = 0.5 * ai
+
+        T2 = T ** 2
+        T3 = T ** 3
+        T4 = T ** 4
+        T5 = T ** 5
+
+        A = np.array([
+            [T3, T4, T5],
+            [3 * T2, 4 * T3, 5 * T4],
+            [6 * T, 12 * T2, 20 * T3]
+        ])
+
+        b = np.array([
+            xf - (a0 + a1 * T + a2 * T2),
+            vf - (a1 + 2 * a2 * T),
+            af - (2 * a2)
+        ])
+
+        x = np.linalg.solve(A, b)
+
+        a3 = x[0]
+        a4 = x[1]
+        a5 = x[2]
+
         return [a0, a1, a2, a3, a4, a5]
+
 
     def calculate_polynomial(self, a, x_vals):
         return a[0] + a[1] * x_vals + a[2] * x_vals**2 + a[3] * x_vals**3 + a[4] * x_vals**4 + a[5] * x_vals**5
