@@ -16,8 +16,8 @@ import time
 class stanley_parking:
     def __init__(self):
         rospy.Subscriber("/global_path", Path, self.global_path_callback)
-        rospy.Subscriber("/lattice_path", Path, self.path_callback)
-        rospy.Subscriber("/local_path_parking", Path, self.local_path_callback)
+        # rospy.Subscriber("/lattice_path", Path, self.path_callback)
+        rospy.Subscriber("/local_path", Path, self.path_callback)
 
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/Ego_topic", EgoVehicleStatus, self.status_callback)
@@ -34,10 +34,10 @@ class stanley_parking:
         self.target_velocity = 10  # Target Velocity in m/s
 
         self.k = 1.0  # Stanley Gain
-        self.k_psi = 1  # For heading Error
-        self.k_y = 0.8  # For CTR Error
+        self.k_psi = 0.3  # For heading Error
+        self.k_y = 1.2  # For CTR Error
 
-        self.max_cross_track_error = 1.0  # Maximum cross track error
+        self.max_cross_track_error = 0.5  # Maximum cross track error
 
         self.vehicle_length = 5.155  # Vehicle Length
 
@@ -49,13 +49,13 @@ class stanley_parking:
         self.end_time = None
         self.errors = []
 
+    # def path_callback(self, msg):
+    #     self.is_path = True
+    #     self.path = msg
+
     def path_callback(self, msg):
         self.is_path = True
         self.path = msg
-
-    def local_path_callback(self, msg):
-        self.is_local_path = True
-        self.local_path = msg
 
     def odom_callback(self, msg):
         self.is_odom = True
@@ -153,7 +153,10 @@ class stanley_parking:
         CTR = atan2(self.k * cross_track_error, self.target_velocity)
         steering = (self.k_psi * heading_error) + (self.k_y * CTR)
 
-        print("parking : ", steering)
+        # print(self.k_psi * heading_error)
+        # print(self.k_y * CTR)
+        # print("\n")
+
         return steering
 
 

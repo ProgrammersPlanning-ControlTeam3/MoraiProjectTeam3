@@ -34,12 +34,15 @@ class PathPub:
         self.x = 0
         self.y = 0
         self.yaw = 0
+        self.isArrived_parkinglot = False
+
 
         rate = rospy.Rate(10)  # 10hz
         while not rospy.is_shutdown():
             if self.is_status and self.global_path_msg.poses:
-                local_path_msg = self.create_local_path_msg()
-                self.local_path_pub.publish(local_path_msg)
+                if self.isArrived_parkinglot == False:
+                    local_path_msg = self.create_local_path_msg()
+                    self.local_path_pub.publish(local_path_msg)
             rate.sleep()
 
     def odom_callback(self, msg):
@@ -50,6 +53,8 @@ class PathPub:
         orientation = msg.pose.pose.orientation
         _, _, self.yaw = euler_from_quaternion([orientation.x, orientation.y, orientation.z, orientation.w])
         # print(self.x, self.y, self.yaw)
+        if self.arrivedAtPoint(7.23,1066.8476) :
+            self.isArrived_parkinglot = True
 
     def global_path_callback(self, msg):
         self.global_path_msg = msg
@@ -179,6 +184,20 @@ class PathPub:
 
     def calculate_polynomial(self, a, x_vals):
         return a[0] + a[1] * x_vals + a[2] * x_vals**2 + a[3] * x_vals**3 + a[4] * x_vals**4 + a[5] * x_vals**5
+
+
+    def get_dist(self, x1, y1, x2, y2):
+        distance = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+        return distance
+
+    def arrivedAtPoint (self,x, y, gap = 5.0) :
+        x1, y1 = self.x , self.y
+        if self.get_dist(x1,y1,x,y) < gap :
+            return True
+        else:
+            return False
+
+
 
 if __name__ == '__main__':
     try:

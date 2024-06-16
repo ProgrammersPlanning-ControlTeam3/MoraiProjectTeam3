@@ -69,7 +69,7 @@ class rule_based_planner:
         self.inParkingLot = False
         self.inTollgate = False
         self.inHighway = False
-        
+        self.inParkingEntrance = False
         self.goal = False
 
         # 제어 시스템 및 알고리즘 초기화 부분
@@ -104,21 +104,25 @@ class rule_based_planner:
                 steering = self.stanley.calc_stanley_control_local()
                 # steering = self.pid_feedforward.calc_pid_feedforward()
 
-                if self.inHighway : 
+                if self.inHighway :
                     # steering = self.pid_feedforward.calc_pid_feedforward()
                     steering = self.stanley.calc_stanley_control()
                     self.re_target_velocity = self.follow_vehicle.control_velocity_avoid_vehicles(self.target_velocity)
                     # self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
 
-                if self.inTollgate : 
-                    steering = self.stanley.calc_stanley_control_local()
+                if self.inTollgate :
+                    steering = self.pid_feedforward.calc_pid_feedforward()
                     self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
 
+                if self.inParkingEntrance :
+                    steering = self.stanley.calc_stanley_control_local()
+                    self.re_target_velocity = 20
+
                 if self.inParkingLot :
+                    print("parking..")
                     steering = self.stanley_parking.calc_stanley_control_local()
-                    # print("In ParkingLot")
-                    self.re_target_velocity = 8
-                
+                    self.re_target_velocity = 10
+
                 self.ctrl_cmd_msg.steering = steering #0.0 last
                 output = self.pid.pid(self.re_target_velocity, self.status_msg.velocity.x * 3.6)
 
@@ -192,9 +196,15 @@ class rule_based_planner:
             self.inTollgate = True
             # print("in tg")
 
-        # Parking Lot
-        if self.arrivedAtPoint(7.23,1066.8476) :
+        # Parking Lot Entrance
+        if self.arrivedAtPoint(-18.00,1040.00) :
             self.inTollgate = False
+            self.inParkingEntrance = True
+            # print("in pl")
+
+        # Parking Lot
+        if self.arrivedAtPoint(7.23,1066.8476, 7) :
+            self.inParkingEntrance = False
             self.inParkingLot = True
             # print("in pl")
         

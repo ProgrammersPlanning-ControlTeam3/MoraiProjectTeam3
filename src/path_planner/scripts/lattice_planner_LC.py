@@ -103,6 +103,8 @@ class latticePlanner:
 
 
     def get_forward_vehicle(self, ref_path, object_data):
+        if len(ref_path.poses) < 2:
+            return None
 
         forward_vehicle = ref_path.poses[0].pose.position
         forward_theta = atan2(ref_path.poses[1].pose.position.y - forward_vehicle.y,

@@ -59,6 +59,7 @@ class PathPub:
         self.yaw = 0
         self.parkingLot = False
         self.isArrived = False
+
         rate = rospy.Rate(10)  # 10hz
         while not rospy.is_shutdown():
             if self.is_status and self.global_path_msg.poses:
@@ -124,6 +125,7 @@ class PathPub:
         for point in local_path:
             tmp_pose = PoseStamped()
             tmp_pose.pose.position.x = point[0]
+            tmp_pose.pose.position.y = point[1]
             tmp_pose.pose.orientation.w = 1
             local_path_msg.poses.append(tmp_pose)
         return local_path_msg

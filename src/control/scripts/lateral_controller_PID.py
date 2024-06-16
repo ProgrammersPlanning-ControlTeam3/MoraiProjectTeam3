@@ -135,14 +135,15 @@ class pid_feedforward:
                 closest_idx = i
 
         lookahead_idx = closest_idx
-        if self.selected_lane.data != 4 and self.selected_lane.data != 1:
-            lookahead_idx += self.lookahead_distance
+        # if self.selected_lane.data != 4 and self.selected_lane.data != 1:
+        #     lookahead_idx += self.lookahead_distance
 
         if lookahead_idx >= len(self.path.poses):
             lookahead_idx = len(self.path.poses) - 1
 
         lookahead_point = self.path.poses[lookahead_idx].pose.position
         lookahead_local = self.transform_to_local(lookahead_point, self.current_postion, self.vehicle_yaw)
+
 
         cte = lookahead_local.y
 
@@ -169,10 +170,10 @@ class pid_feedforward:
             self.Ki = 0.00
             self.kff = 0.0001
         else:
-            self.Kp = 0.7
-            self.Kd = 0.01
-            self.Ki = 0.001
-            self.kff = 0.0005
+            self.Kp = 0.8
+            self.Kd = 0.02
+            self.Ki = 0.002
+            self.kff = 0.001
 
         self.error = cte
 
@@ -184,11 +185,11 @@ class pid_feedforward:
 
         self.error_prev = self.error
 
-        max_steering_angle = pi / 18
+        max_steering_angle = pi / 9
         self.u = np.clip(self.u, -max_steering_angle, max_steering_angle)
 
         max_steering_rate = 0.01
-        if abs(self.u - self.u_prev) > 0.1:
+        if abs(self.u - self.u_prev) > 0.05:
             if self.u > self.u_prev:
                 self.u = self.u_prev + max_steering_rate
             else:
