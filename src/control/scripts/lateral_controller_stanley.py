@@ -11,7 +11,7 @@ from morai_msgs.msg import EgoVehicleStatus, ObjectStatusList
 import matplotlib.pyplot as plt
 import time
 import sys
-sys.path.insert(0, '/home/ubuntu/MoraiProjectTeam3/src')
+sys.path.insert(0, '../src')
 from control.scripts.controller_utils import unified_calculator, plot_paths, get_waypoint
 
 class stanley:

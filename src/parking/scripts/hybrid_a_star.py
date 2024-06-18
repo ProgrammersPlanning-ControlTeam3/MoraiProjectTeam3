@@ -174,7 +174,7 @@ def heuristic(cur_node, goal_node):
     dist = np.sqrt((cur_node.position[0] - goal_node.position[0])**2 + (cur_node.position[1]  - goal_node.position[1])**2)
     return dist
 
-def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
+def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight, epsilon_position =3):
 
     start_node = Node(None, position = start)
     goal_node = Node(None, position = goal)
@@ -183,7 +183,7 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
     closed_list = []
     yaw_rate = Vx / R
     open_list.append(start_node)
-
+    
     while open_list != [] :
         # Find node with lowest cost
         cur_node = open_list[0]
@@ -198,7 +198,7 @@ def a_star(start, goal, space, obstacle_list, R, Vx, delta_time_step, weight):
         # print("cur node = ", cur_index, cur_node.position, cur_node.f)
 
         # If goal, return optimal path
-        if (isSamePosition(cur_node, goal_node, epsilon_position=12)):
+        if (isSamePosition(cur_node, goal_node, epsilon_position)):
             opt_path = []
             node = cur_node
             while node is not None :
@@ -336,10 +336,31 @@ def main():
 
 def hybrid_a_star():
     #goal= [x,y ,yaw]
+    fake_goal = [7.93, 1029.1 , 5.65]
+    
+    # fake_goal = [5.13, 1031.59 , 5.65]
+    
     start, goal, obstacle_list, space = map()
-    opt_path = a_star(start, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1)
-    # opt_path.append(goal)
+    
+    # goal_temp = list(goal)
+    # goal[0] = 6.98
+    # goal[1] = 1027.88
+    # goal[2] = 2
 
+    # start to fake goal
+    opt_path = a_star(start, fake_goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1, epsilon_position=2)
+    # print(opt_path[-1])
+    
+    print("Optimal path found!")
+    
+    # #fake to goal
+    # opt_path_2 = a_star(fake_goal, goal, space, obstacle_list, R=4.51, Vx=4.0, delta_time_step=0.5, weight=1.1, epsilon_position=2)
+    
+    
+    # print("Optimal path found!")
+    # opt_path.append(goal)
+    # opt_path.extend(opt_path_2)
+    
     out_path = Path()
     # out_path.header.frame_id = '/map'
 
@@ -353,24 +374,27 @@ def hybrid_a_star():
     #     read_pose.pose.position.y = path_y
     #     read_pose.pose.orientation.w = path_yaw
     #     out_path.poses.append(read_pose)
-
+    #
+    
+    
     #마지막 point 에서 주차goal 까지 dubins로 경로 생성.
+    dubins_path = []
+    
     dubins = Dubins()
     kappa_ = .5/2.0
     cartesian_path, _,_ = dubins.plan(opt_path[-1],goal,kappa_)
     path_x , path_y , path_yaw = cartesian_path
-    dubins_path = []
     
     for i in range(len(path_x)) :
         # opt_path.append([path_x[i],path_y[i],path_yaw[i]])
         dubins_path.append([path_x[i],path_y[i]])
-    print(dubins_path)
+    # print(dubins_path)
 
     return opt_path, out_path, dubins_path
 
 if __name__ == "__main__":
-    #hybrid_a_star()
-    main()
+    hybrid_a_star()
+    # main()
 
 
 

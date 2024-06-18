@@ -42,10 +42,10 @@ class FollowVehicle:
         if is_forward:
             if self.selected_lane.data == 1:
                 if forward_dist < self.time_gap * self.status_msg.velocity.x:
-                    desired_velocity = min(desired_velocity, forward_speed - 5.0)
-                if forward_dist < 5:
+                    desired_velocity = min(desired_velocity, forward_speed - 2.0)
+                if forward_dist < 3:
                     desired_velocity = -5.0
-            elif forward_dist < 10:
+            elif forward_dist < 3:
                 desired_velocity = -1.0
         elif self.checkObject_npc_path(self.lattice_path, self.object_path) and self.selected_lane.data == 1:
             desired_velocity = target_velocity - 5.0

@@ -23,7 +23,7 @@ class hybrid_a_star_pub :
 
         _, self.global_path_msg = hybrid_a_star.hybrid_a_star()
 
-        rate = rospy.Rate(10) # 10hz
+        rate = rospy.Rate(30) # 10hz
         while not rospy.is_shutdown() :
             self.global_path_pub.publish(self.global_path_msg)
             rate.sleep()

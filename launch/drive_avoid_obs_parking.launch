@@ -18,10 +18,15 @@
   <!-- visualize Obstacle -->
   <node pkg="parking" type="visualizeObstacle.py" name="visualize_obstacle" />
   
+  <node pkg="prediction" type="bayseian.py" name="bayseian"/>
+  <!-- <node pkg="prediction" type="vehicle_tracker.py" name="vehicle_tracker"/> -->
+  <node pkg="prediction" type="hmm_prediction_path.py" name="hmm_prediction_path" />
 
   <!-- <node pkg="parking" type="path_maker.py" name="parking" /> -->
 
   <!-- CONTROL_Pure Pursuit -->
+  <node pkg="control" type="longitudinal_controller_follow_vehicle.py" name="longitudinal_controller" output="screen"/>
+
   <!-- <node pkg="motion_planner" type="rule_based_planner_avoid_obstacle.py" name="rule_based_planner" output="screen"/> -->
   <node pkg="motion_planner" type="rule_based_planner_parking_stanley.py" name="rule_based_planner" output="screen"/>
 
@@ -40,7 +45,6 @@
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rviz_runner)/rviz/kcity_rviz.rviz"/>
 
 
-  <!-- <node pkg="control" type="longitudinal_controller.py" name="longitudinal_controller" output="screen"/> -->
   <!-- <node pkg="control" type="experiment.py" name="experiment" output="screen"/> -->
 
 </launch>

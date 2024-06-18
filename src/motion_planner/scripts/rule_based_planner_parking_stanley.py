@@ -111,7 +111,8 @@ class rule_based_planner:
                     # self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
 
                 if self.inTollgate :
-                    steering = self.pid_feedforward.calc_pid_feedforward()
+                    steering = self.stanley.calc_stanley_control()
+                    # steering = self.pid_feedforward.calc_pid_feedforward()
                     self.re_target_velocity = self.follow_vehicle.control_velocity_follow_vehicles(self.target_velocity)
 
                 if self.inParkingEntrance :
@@ -191,7 +192,7 @@ class rule_based_planner:
             self.inHighway = True
             # print("in hw")
 
-        if self.arrivedAtPoint(209.9,1290.3) : 
+        if self.arrivedAtPoint(210.5,1330.0) : 
             self.inHighway = False
             self.inTollgate = True
             # print("in tg")
@@ -203,13 +204,13 @@ class rule_based_planner:
             # print("in pl")
 
         # Parking Lot
-        if self.arrivedAtPoint(7.23,1066.8476, 7) :
+        if self.arrivedAtPoint(7.23,1066.8476, 5) :
             self.inParkingEntrance = False
             self.inParkingLot = True
             # print("in pl")
         
         # goal
-        if self.arrivedAtPoint(5.25,1021.73, 1) :
+        if self.arrivedAtPoint(5.25,1021.73, 0.4) :
             self.goal = True
             # print("in pl")
 

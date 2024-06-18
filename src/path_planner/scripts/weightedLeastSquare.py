@@ -22,7 +22,9 @@ class WeightedLeastSquare:
         residual = y_data - model_data
         J_matrix = np.array([[sp.diff(self.polynomial_func, b).subs(self.x_sym, x).evalf() for b in self.b] for x in x_data]) # 잔차에 대한 계수 편미분값
         J_matrix = np.array(J_matrix, dtype = np.float64)
-        weights = np.ones_like(x_data)
+        # weights = np.ones_like(x_data)
+        weights = [100, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 100]
+
         weights[0] *= self.start_end_weight_multiplier
         weights[-1] *= self.start_end_weight_multiplier
         W = np.diag(weights)

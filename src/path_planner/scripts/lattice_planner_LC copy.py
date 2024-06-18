@@ -103,6 +103,8 @@ class latticePlanner:
 
 
     def get_forward_vehicle(self, ref_path, object_data):
+        if len(ref_path.poses) < 2:
+            return None
 
         forward_vehicle = ref_path.poses[0].pose.position
         forward_theta = atan2(ref_path.poses[1].pose.position.y - forward_vehicle.y,
@@ -136,7 +138,7 @@ class latticePlanner:
 
     def collision_check(self, object_data, out_path):
         selected_lane = -1
-        lane_weight = [5, 2, 80, 5, 0, 80]
+        lane_weight = [5, 2, 1000, 5, 0, 10000]
         maneuver_weights = [{"lane_keeping": 0, "right_change": 0, "left_change": 0} for _ in range(len(out_path))]
 
         def calculate_risk(center1, center2):
@@ -152,10 +154,11 @@ class latticePlanner:
         forward_vehicle_id = None
         if forward_vehicle_check is not None:
             if self.foward_vehicle_speed > 15:
-                path_length = min(self.target_velocity, self.status_msg.velocity.x)
+                path_length = min(self.target_velocity, self.status_msg.velocity.x * 3.0)
             else:
                 path_length = self.target_velocity
             short_path_length = path_length * 0.6
+            print(path_length)
 
         npc_ids_in_range = self.get_npc_ids_in_range(self.local_path, object_data, -40, 50, -5, 5)
 
@@ -184,10 +187,10 @@ class latticePlanner:
                 lane_weight[path_num] += maneuver_weights[path_num]["right_change"] * self.vehicle_probability_LR
                 lane_weight[path_num] += maneuver_weights[path_num]["left_change"] * self.vehicle_probability_LL
 
-                # print("[", path_num, "LK ] : ", maneuver_weights[path_num]["lane_keeping"])
-                # print("[", path_num, "LR ] : ", maneuver_weights[path_num]["right_change"])
-                # print("[", path_num, "LL ] : ", maneuver_weights[path_num]["left_change"])
-                # print("\n")
+                print("[", path_num, "LK ] : ", maneuver_weights[path_num]["lane_keeping"])
+                print("[", path_num, "LR ] : ", maneuver_weights[path_num]["right_change"])
+                print("[", path_num, "LL ] : ", maneuver_weights[path_num]["left_change"])
+                print("\n")
 
         if forward_vehicle_check is not None and npc_ids_in_range:
             # Calculate distance between the first points
@@ -208,15 +211,15 @@ class latticePlanner:
         else:
             selected_lane = lane_weight.index(min(lane_weight))
 
-        # print("Lane change : ", selected_lane)
-        # print("min weight : ", lane_weight[selected_lane])
-        # print("0 : ", lane_weight[0])
-        # print("1 : ", lane_weight[1])
-        # print("2 : ", lane_weight[2])
-        # print("3 : ", lane_weight[3])
-        # print("4 : ", lane_weight[4])
-        # print("5 : ", lane_weight[5])
-        # print("\n")
+        print("Lane change : ", selected_lane)
+        print("min weight : ", lane_weight[selected_lane])
+        print("0 : ", lane_weight[0])
+        print("1 : ", lane_weight[1])
+        print("2 : ", lane_weight[2])
+        print("3 : ", lane_weight[3])
+        print("4 : ", lane_weight[4])
+        print("5 : ", lane_weight[5])
+        print("\n")
 
         if lane_weight[selected_lane] >= 1000: # 모든 경로의 웨이트가 높은 경우 직진 -> 감속하기 위해서
             selected_lane = 1
@@ -314,7 +317,7 @@ class latticePlanner:
                     goal_d_with_offset = vehicle_d + lane_offset
 
                     # forward vehicle's speed based target point -> changed to controlled velocity (전방향 차량 속도에 따라 제어된 속도값 사용 : 현재 차량의 속도값 사용하게 됨)
-                    if self.foward_vehicle_speed > 15:
+                    if self.foward_vehicle_speed > 10:
                         goal_s_with_offset = vehicle_s + min(self.target_velocity, max(self.status_msg.velocity.x * 3.0, 30)) * time_offset
                     else :
                         goal_s_with_offset = vehicle_s + self.target_velocity * time_offset
@@ -325,7 +328,7 @@ class latticePlanner:
 
                     # 5차 곡선
                     xs = vehicle_s
-                    xf = goal_s_with_offset - vehicle_s
+                    xf = goal_s_with_offset
                     ys = vehicle_d
                     yf = goal_d_with_offset
 

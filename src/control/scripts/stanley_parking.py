@@ -33,9 +33,9 @@ class stanley_parking:
 
         self.target_velocity = 10  # Target Velocity in m/s
 
-        self.k = 1.0  # Stanley Gain
-        self.k_psi = 0.3  # For heading Error
-        self.k_y = 1.2  # For CTR Error
+        self.k = 1.1  # Stanley Gain
+        self.k_psi = 0.2  # For heading Error
+        self.k_y = 1.0  # For CTR Error
 
         self.max_cross_track_error = 0.5  # Maximum cross track error
 
